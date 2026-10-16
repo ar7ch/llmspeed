@@ -16,6 +16,8 @@ const CONFIG = {
 }
 
 const REPO = 'nicorobinreal/llmspeed'
+// below this the count reads as anti-social-proof, so the pills just say "Star"
+const STAR_COUNT_MIN = 50
 const STAR_ICON = <svg class="sb-star" viewBox="0 0 16 16" width={14} height={14} fill="currentColor"><path d="M8 .9l2.2 4.5 4.9.7-3.6 3.5.9 4.9L8 12.2l-4.4 2.3.9-4.9L.9 6.1l4.9-.7z" /></svg>
 const fmtStars = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : `${n}`
 
@@ -650,7 +652,7 @@ export class App extends Component<{}, St> {
       share: () => this.share(),
       shareLabel: s.shared ? 'Copied' : 'Share',
       repoUrl: `https://github.com/${REPO}`,
-      starCount: s.stars !== null ? fmtStars(s.stars) : '',
+      starCount: s.stars !== null && s.stars >= STAR_COUNT_MIN ? fmtStars(s.stars) : '',
       starClick: (button: 'nav' | 'cta') => track('star-click', { button }),
       // post-run ask: shown whenever a run has finished
       showStarCta: s.phase === 'done',
