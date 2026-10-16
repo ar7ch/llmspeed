@@ -56,3 +56,13 @@ textarea:focus,select:focus,button:focus{outline:none}
 .hv-text-ink:hover{color:var(--c-ink)!important}
 .hv-dash:hover{border-color:var(--c-text-faint)!important;color:var(--c-ink)!important}
 }
+
+/* star-on-GitHub pills (navbar + post-run ask): animated coral→gold ring + the hero "feel" gradient on the label */
+.sb{display:inline-flex;align-items:center;gap:7px;border-radius:99px;padding:6px 13px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid transparent;background:linear-gradient(var(--c-bg),var(--c-bg)) padding-box,linear-gradient(105deg,oklch(0.62 0.17 30),oklch(0.8 0.16 82),oklch(0.62 0.17 30),oklch(0.8 0.16 82)) border-box;background-size:100% 100%,300% 100%;animation:sbBorder 6s ease-in-out infinite;color:var(--c-text-strong);transition:box-shadow .2s ease}
+.sb svg{flex-shrink:0}
+.sb-label{background:linear-gradient(105deg,var(--c-text-strong) 20%,oklch(0.62 0.17 30) 40%,oklch(0.72 0.15 45) 50%,oklch(0.62 0.17 30) 60%,var(--c-text-strong) 80%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:feelGradient 7s ease-in-out infinite}
+.sb-star{color:oklch(0.78 0.16 75)}
+.sb-count{display:inline-flex;align-items:center;gap:4px;padding-left:8px;border-left:1px solid var(--c-border);font-family:'IBM Plex Mono',monospace;font-size:12px}
+.sb-cta .sb-count{padding-left:0;border-left:none;color:var(--c-text-faint)}
+@keyframes sbBorder{0%,100%{background-position:0 0,0% 50%}50%{background-position:0 0,100% 50%}}
+@media (hover:hover){.sb:hover{box-shadow:0 2px 12px oklch(0.7 0.16 50 / .25)}}

@@ -14,6 +14,10 @@ const CONFIG = {
   showShare: false,
 }
 
+const REPO = 'nicorobinreal/llmspeed'
+const STAR_ICON = <svg class="sb-star" viewBox="0 0 16 16" width={14} height={14} fill="currentColor"><path d="M8 .9l2.2 4.5 4.9.7-3.6 3.5.9 4.9L8 12.2l-4.4 2.3.9-4.9L.9 6.1l4.9-.7z" /></svg>
+const fmtStars = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : `${n}`
+
 interface Cfg { hw: string; model: string; quant: string }
 interface Msg { role: 'user' | 'assistant'; text: string; meta?: string }
 interface LaneSt { phase: 'norun' | 'prefill' | 'stream' | 'done'; prefillT: number; text: string; liveTok: number; finishT: number; winner: boolean }
@@ -26,6 +30,8 @@ interface St {
   isMobile: boolean; cfgOpen: boolean; composerH: number
   /** a run=1 share link was opened: render the conversation view immediately, run() fires shortly */
   pendingShare: boolean
+  /** GitHub stargazer count; null until fetched (or if the API is unavailable) */
+  stars: number | null; starred: boolean
 }
 interface RunLane { hw: Hw; m: Model; q: Quant; c: CalcResult; norun: boolean; acc: number; i: number; done: boolean; streamStarted: boolean; liveTok: number; finishT: number }
 
@@ -43,7 +49,7 @@ export class App extends Component<{}, St> {
       dd: null, tip: null, hwSort: 'pop', modelSort: 'pop', lanes: [], racePrompt: '', shared: false, dark: false,
       feelPhase: 'type', feelN: 0, feelT: 0,
       isMobile: typeof matchMedia !== 'undefined' && matchMedia('(max-width:640px)').matches, cfgOpen: false, composerH: 140,
-      pendingShare: false,
+      pendingShare: false, stars: null, starred: false,
     }
     // share links are applied before the first render so the hero never flashes
     try {
@@ -180,6 +186,7 @@ export class App extends Component<{}, St> {
       window.visualViewport.addEventListener('resize', this._vv)
     }
     try { if (localStorage.getItem('dryrun-theme') === 'dark') this.setState({ dark: true }) } catch (e) { }
+    this.loadStars()
     this._syncDark(this.state.dark)
     this._syncScroll(this.heroNow())
     this.feelTimer = setInterval(() => {
@@ -365,6 +372,20 @@ export class App extends Component<{}, St> {
       this._replayHistory = h
     }
     this.run()
+  }
+
+  // star count is cached for an hour: the unauthenticated GitHub API allows 60 req/h per IP
+  loadStars() {
+    try {
+      if (localStorage.getItem('llmspeed-starred')) this.setState({ starred: true })
+      const c = JSON.parse(localStorage.getItem('llmspeed-stars') || 'null')
+      if (c && Date.now() - c.t < 3600e3) { this.setState({ stars: c.n }); return }
+    } catch (e) { }
+    fetch(`https://api.github.com/repos/${REPO}`).then(r => r.ok ? r.json() : null).then(d => {
+      if (!d || typeof d.stargazers_count !== 'number') return
+      this.setState({ stars: d.stargazers_count })
+      try { localStorage.setItem('llmspeed-stars', JSON.stringify({ n: d.stargazers_count, t: Date.now() })) } catch (e) { }
+    }).catch(() => { })
   }
 
   share() {
@@ -614,6 +635,11 @@ export class App extends Component<{}, St> {
       removeCompare: () => this.setState(x => ({ cfgs: [x.cfgs[0]], lanes: [], phase: 'idle' as const })),
       share: () => this.share(),
       shareLabel: s.shared ? 'Copied' : 'Share',
+      repoUrl: `https://github.com/${REPO}`,
+      starCount: s.stars !== null ? fmtStars(s.stars) : '',
+      starClick: () => { try { localStorage.setItem('llmspeed-starred', '1') } catch (e) { } this.setState({ starred: true }) },
+      // post-run ask: only once a run has finished, and not again after the visitor clicked through
+      showStarCta: s.phase === 'done' && !s.starred,
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
       wontRun: !compare && c0.fit === 'no' && !busy && !(collapse && s.cfgOpen),
       wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${r._hw.name} has ${c0.usable.toFixed(1)} GB usable. ${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
@@ -713,6 +739,7 @@ export class App extends Component<{}, St> {
                   <div style="font-size:15px; line-height:26px; color:var(--c-text); white-space:pre-wrap">{v.streamText}<span style="display:inline-block; width:8px; height:17px; background:oklch(0.62 0.17 30); vertical-align:-2px; margin-left:2px; animation:blink 1s step-end infinite"></span></div>
                 </div>
               )}
+              {v.showStarCta && this.renderStarCta(v)}
             </div>
           )}
           {v.raceMode && (
@@ -740,6 +767,7 @@ export class App extends Component<{}, St> {
                   </div>
                 ))}
               </div>
+              {v.showStarCta && this.renderStarCta(v)}
             </div>
           )}
           {v.heroMode && this.renderComposer(v)}
@@ -774,9 +802,10 @@ export class App extends Component<{}, St> {
             {v.showCompareNav && (
               <button onClick={v.addCompare} class="hv-ink" style="display:inline-flex; align-items:center; gap:6px; background:none; border:1px solid var(--c-border); color:var(--c-text-sec); border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer">⇄ Compare</button>
             )}
-            <a href="https://github.com/nicorobinreal/llmspeed" target="_blank" rel="noopener" class="hv-ink" style="display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:500; color:var(--c-text-sec); text-decoration:none; border:1px solid var(--c-border); border-radius:99px; padding:6px 13px">
+            <a href={v.repoUrl} target="_blank" rel="noopener" onClick={v.starClick} title="Star llmspeed on GitHub" class="sb">
               <svg viewBox="0 0 16 16" width={15} height={15} fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
-              GitHub
+              <span class="sb-label">Star</span>
+              {v.starCount && <span class="sb-count">{STAR_ICON}{v.starCount}</span>}
             </a>
             <button onClick={v.toggleDark} title={v.isLight ? 'Switch to dark mode' : 'Switch to light mode'} aria-label={v.isLight ? 'Switch to dark mode' : 'Switch to light mode'} class="hv-ink" style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:99px; border:1px solid var(--c-border); background:none; color:var(--c-text-sec); cursor:pointer; padding:0">
               {v.isLight
@@ -785,6 +814,19 @@ export class App extends Component<{}, St> {
             </button>
           </div>
         </nav>
+    )
+  }
+
+  renderStarCta(v: ReturnType<App['renderVals']>) {
+    return (
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px; font-size:13px; color:var(--c-text-muted); animation:bubbleIn .6s cubic-bezier(.22,.61,.36,1) both">
+            <span>Useful? A star helps others find it.</span>
+            <a href={v.repoUrl} target="_blank" rel="noopener" onClick={v.starClick} class="sb sb-cta">
+              {STAR_ICON}
+              <span class="sb-label">Star on GitHub</span>
+              {v.starCount && <span class="sb-count">{v.starCount}</span>}
+            </a>
+          </div>
     )
   }
 
