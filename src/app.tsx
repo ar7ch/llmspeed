@@ -47,7 +47,9 @@ export class App extends Component<{}, St> {
     const base: St = {
       cfgs: [{ hw: 'rtx-4090', model: 'llama-3.1-8b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
       streamText: '', liveTok: 0, prefillT: 0, breakdownOpen: false, history: [],
-      dd: null, tip: null, hwSort: 'pop', modelSort: 'pop', lanes: [], racePrompt: '', shared: false, dark: false,
+      dd: null, tip: null, hwSort: 'pop', modelSort: 'pop', lanes: [], racePrompt: '', shared: false,
+      // index.html picks the theme before first paint (saved choice, else system setting)
+      dark: typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'),
       feelPhase: 'type', feelN: 0, feelT: 0,
       isMobile: typeof matchMedia !== 'undefined' && matchMedia('(max-width:640px)').matches, cfgOpen: false, composerH: 140,
       pendingShare: false, stars: null,
@@ -123,6 +125,8 @@ export class App extends Component<{}, St> {
     if (meta) meta.setAttribute('content', d ? '#111114' : '#ffffff')
   }
   _vv?: () => void
+  _sysDark?: MediaQueryList
+  _sysDarkL?: () => void
   _ro?: ResizeObserver
   // stable ref callback: measures the floating composer so the conversation gets matching bottom padding
   _compRef = (el: HTMLElement | null) => {
@@ -186,7 +190,13 @@ export class App extends Component<{}, St> {
       }
       window.visualViewport.addEventListener('resize', this._vv)
     }
-    try { if (localStorage.getItem('dryrun-theme') === 'dark') this.setState({ dark: true }) } catch (e) { }
+    // follow live system theme changes until the visitor picks one with the toggle
+    this._sysDark = matchMedia('(prefers-color-scheme: dark)')
+    this._sysDarkL = () => {
+      try { if (localStorage.getItem('dryrun-theme')) return } catch (e) { }
+      this.setState({ dark: this._sysDark!.matches })
+    }
+    if (this._sysDark.addEventListener) this._sysDark.addEventListener('change', this._sysDarkL)
     this.loadStars()
     this._syncDark(this.state.dark)
     this._syncScroll(this.heroNow())
@@ -251,6 +261,7 @@ export class App extends Component<{}, St> {
       else (this._mq as MediaQueryList & { removeListener(l: () => void): void }).removeListener(this._mqL)
     }
     if (this._vv && window.visualViewport) window.visualViewport.removeEventListener('resize', this._vv)
+    if (this._sysDark && this._sysDarkL && this._sysDark.removeEventListener) this._sysDark.removeEventListener('change', this._sysDarkL)
     if (this._ro) this._ro.disconnect()
   }
 

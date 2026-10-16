@@ -19,6 +19,14 @@
   <meta name="twitter:description" content="Feel how fast a local LLM runs before you buy the hardware." />
   <meta name="twitter:image" content="https://llmspeed.dev/og.png" />
   <meta name="theme-color" content="#ffffff" />
+  <!-- theme before first paint: saved choice, else the system setting (avoids a light flash for dark-mode users) -->
+  <script>
+    (function () {
+      var t = null; try { t = localStorage.getItem('dryrun-theme') } catch (e) { }
+      var d = t ? t === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+      if (d) { document.documentElement.classList.add('theme-dark'); document.querySelector('meta[name="theme-color"]').setAttribute('content', '#111114') }
+    })()
+  </script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>" />
   <!-- Umami analytics: cookie-free; data-domains keeps local dev/preview visits out of the stats -->
   <script defer src="https://cloud.umami.is/script.js" data-website-id="16fd7996-2057-4fc9-a322-abc6029a948e" data-domains="llmspeed.dev"></script>
