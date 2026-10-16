@@ -32,7 +32,7 @@ interface St {
   /** a run=1 share link was opened: render the conversation view immediately, run() fires shortly */
   pendingShare: boolean
   /** GitHub stargazer count; null until fetched (or if the API is unavailable) */
-  stars: number | null; starred: boolean
+  stars: number | null
 }
 interface RunLane { hw: Hw; m: Model; q: Quant; c: CalcResult; norun: boolean; acc: number; i: number; done: boolean; streamStarted: boolean; liveTok: number; finishT: number }
 
@@ -50,7 +50,7 @@ export class App extends Component<{}, St> {
       dd: null, tip: null, hwSort: 'pop', modelSort: 'pop', lanes: [], racePrompt: '', shared: false, dark: false,
       feelPhase: 'type', feelN: 0, feelT: 0,
       isMobile: typeof matchMedia !== 'undefined' && matchMedia('(max-width:640px)').matches, cfgOpen: false, composerH: 140,
-      pendingShare: false, stars: null, starred: false,
+      pendingShare: false, stars: null,
     }
     // share links are applied before the first render so the hero never flashes
     try {
@@ -379,7 +379,6 @@ export class App extends Component<{}, St> {
   // star count is cached for an hour: the unauthenticated GitHub API allows 60 req/h per IP
   loadStars() {
     try {
-      if (localStorage.getItem('llmspeed-starred')) this.setState({ starred: true })
       const c = JSON.parse(localStorage.getItem('llmspeed-stars') || 'null')
       if (c && Date.now() - c.t < 3600e3) { this.setState({ stars: c.n }); return }
     } catch (e) { }
@@ -641,9 +640,9 @@ export class App extends Component<{}, St> {
       shareLabel: s.shared ? 'Copied' : 'Share',
       repoUrl: `https://github.com/${REPO}`,
       starCount: s.stars !== null ? fmtStars(s.stars) : '',
-      starClick: (button: 'nav' | 'cta') => { track('star-click', { button }); try { localStorage.setItem('llmspeed-starred', '1') } catch (e) { } this.setState({ starred: true }) },
-      // post-run ask: only once a run has finished, and not again after the visitor clicked through
-      showStarCta: s.phase === 'done' && !s.starred,
+      starClick: (button: 'nav' | 'cta') => track('star-click', { button }),
+      // post-run ask: shown whenever a run has finished
+      showStarCta: s.phase === 'done',
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
       wontRun: !compare && c0.fit === 'no' && !busy && !(collapse && s.cfgOpen),
       wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${r._hw.name} has ${c0.usable.toFixed(1)} GB usable. ${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
