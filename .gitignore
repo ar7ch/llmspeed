@@ -1,6 +1,7 @@
 node_modules/
 dist/
-.claude
+.claude/*
+!.claude/settings.json
 data/*
 !data/app-data.json
 docs/

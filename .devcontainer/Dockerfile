@@ -36,6 +36,9 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
     && touch /commandhistory/.bash_history \
     && echo "$SNIPPET" >> /root/.bashrc
 
+# Run Claude Code without permission prompts (the container is the sandbox; IS_SANDBOX=1 allows root)
+RUN echo "alias claude='claude --dangerously-skip-permissions'" >> /root/.bashrc
+
 # Node.js 22 LTS (official binaries)
 ARG NODE_VERSION=22.14.0
 RUN ARCH=$(dpkg --print-architecture) \
