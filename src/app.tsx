@@ -1,6 +1,7 @@
 import { Component, type ComponentChild } from 'preact'
 import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type Fit } from './calc'
+import { track } from './analytics'
 
 // Design knobs — values match the mockup's exported defaults (Tokens Simulator v3).
 const CONFIG = {
@@ -278,6 +279,7 @@ export class App extends Component<{}, St> {
     const replayH = this._replayHistory
     this._replayHistory = null
     const s = this.state, ctx = this.promptTokens()
+    track('run', { mode: s.cfgs.length > 1 ? 'race' : 'single', hw: s.cfgs.map(c => c.hw).join(','), model: s.cfgs.map(c => c.model).join(','), quant: s.cfgs.map(c => c.quant).join(','), prompt: s.custom !== null ? 'custom' : PRESETS[s.preset].label })
     const lanes: RunLane[] = s.cfgs.map(cfg => {
       const { hw, m, q } = this.resolve(cfg)
       const c = calc(hw, m, q, ctx)
@@ -397,6 +399,8 @@ export class App extends Component<{}, St> {
     if (s.custom !== null) q.set('prompt', s.custom.slice(0, 2000))
     else q.set('preset', String(s.preset))
     q.set('run', '1')
+    q.set('utm_source', 'share')
+    track('share')
     const url = 'https://llmspeed.dev/?' + q.toString().replace(/%2C/g, ',')
     ;(navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).catch(() => { })
     this.setState({ shared: true })
@@ -631,13 +635,13 @@ export class App extends Component<{}, St> {
         if (v === 'ink-solid') return `${base}; background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)`
         return `${base}; background:none; border:1px solid var(--c-border); color:var(--c-text-sec); font-weight:500`
       })(),
-      addCompare: () => this.setState(x => ({ cfgs: [x.cfgs[0], { ...x.cfgs[0], hw: x.cfgs[0].hw === 'm4-pro-24gb' ? 'rtx-4090' : 'm4-pro-24gb' }], lanes: [], racePrompt: '', phase: 'idle' as const })),
+      addCompare: () => { track('compare'); this.setState(x => ({ cfgs: [x.cfgs[0], { ...x.cfgs[0], hw: x.cfgs[0].hw === 'm4-pro-24gb' ? 'rtx-4090' : 'm4-pro-24gb' }], lanes: [], racePrompt: '', phase: 'idle' as const })) },
       removeCompare: () => this.setState(x => ({ cfgs: [x.cfgs[0]], lanes: [], phase: 'idle' as const })),
       share: () => this.share(),
       shareLabel: s.shared ? 'Copied' : 'Share',
       repoUrl: `https://github.com/${REPO}`,
       starCount: s.stars !== null ? fmtStars(s.stars) : '',
-      starClick: () => { try { localStorage.setItem('llmspeed-starred', '1') } catch (e) { } this.setState({ starred: true }) },
+      starClick: (button: 'nav' | 'cta') => { track('star-click', { button }); try { localStorage.setItem('llmspeed-starred', '1') } catch (e) { } this.setState({ starred: true }) },
       // post-run ask: only once a run has finished, and not again after the visitor clicked through
       showStarCta: s.phase === 'done' && !s.starred,
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
@@ -802,7 +806,7 @@ export class App extends Component<{}, St> {
             {v.showCompareNav && (
               <button onClick={v.addCompare} class="hv-ink" style="display:inline-flex; align-items:center; gap:6px; background:none; border:1px solid var(--c-border); color:var(--c-text-sec); border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer">⇄ Compare</button>
             )}
-            <a href={v.repoUrl} target="_blank" rel="noopener" onClick={v.starClick} title="Star llmspeed on GitHub" class="sb">
+            <a href={v.repoUrl} target="_blank" rel="noopener" onClick={() => v.starClick('nav')} title="Star llmspeed on GitHub" class="sb">
               <svg viewBox="0 0 16 16" width={15} height={15} fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" /></svg>
               <span class="sb-label">Star</span>
               {v.starCount && <span class="sb-count">{STAR_ICON}{v.starCount}</span>}
@@ -821,7 +825,7 @@ export class App extends Component<{}, St> {
     return (
           <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px; font-size:13px; color:var(--c-text-muted); animation:bubbleIn .6s cubic-bezier(.22,.61,.36,1) both">
             <span>Useful? A star helps others find it.</span>
-            <a href={v.repoUrl} target="_blank" rel="noopener" onClick={v.starClick} class="sb sb-cta">
+            <a href={v.repoUrl} target="_blank" rel="noopener" onClick={() => v.starClick('cta')} class="sb sb-cta">
               {STAR_ICON}
               <span class="sb-label">Star on GitHub</span>
               {v.starCount && <span class="sb-count">{v.starCount}</span>}
