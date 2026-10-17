@@ -40,7 +40,6 @@ interface St {
   /** GitHub stargazer count; null until fetched (or if the API is unavailable) */
   stars: number | null
   /** one-time "star the repo" modal after the visitor's first finished run */
-  starPopup: boolean
 }
 interface RunLane { hw: Hw; m: Model; q: Quant; c: CalcResult; norun: boolean; acc: number; i: number; done: boolean; streamStarted: boolean; liveTok: number; finishT: number }
 
@@ -60,7 +59,7 @@ export class App extends Component<{}, St> {
       dark: typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'),
       feelPhase: 'type', feelN: 0, feelT: 0,
       isMobile: typeof matchMedia !== 'undefined' && matchMedia('(max-width:640px)').matches, cfgOpen: false, composerH: 140,
-      pendingShare: false, stars: null, starPopup: false,
+      pendingShare: false, stars: null,
     }
     const pc = pageCfg(PAGE, base.cfgs[0])
     if (pc) base.cfgs = [pc]
@@ -135,7 +134,6 @@ export class App extends Component<{}, St> {
     if (meta) meta.setAttribute('content', d ? '#111114' : '#ffffff')
   }
   _vv?: () => void
-  _popT?: ReturnType<typeof setTimeout>
   _sysDark?: MediaQueryList
   _sysDarkL?: () => void
   _ro?: ResizeObserver
@@ -209,7 +207,6 @@ export class App extends Component<{}, St> {
     }
     if (this._sysDark.addEventListener) this._sysDark.addEventListener('change', this._sysDarkL)
     this.loadStars()
-    document.addEventListener('keydown', this._popKey)
     this._syncDark(this.state.dark)
     this._syncScroll(this.heroNow())
     this.feelTimer = setInterval(() => {
@@ -266,7 +263,6 @@ export class App extends Component<{}, St> {
     }
   }
   componentWillUnmount() {
-    clearTimeout(this._popT); document.removeEventListener('keydown', this._popKey)
     clearInterval(this.timer); clearInterval(this.feelTimer)
     if (this._doc) document.removeEventListener('click', this._doc)
     if (this._mq && this._mqL) {
@@ -362,7 +358,6 @@ export class App extends Component<{}, St> {
     if (allDone) {
       clearInterval(this.timer)
       st.phase = 'done'
-      this.maybeStarPopup()
       if (!this.isCompare()) {
         const l = lanes[0]
         const meta = `${l.hw.name} · ${l.m.name} · ${l.q.label} · ${fmt(l.c.base)} tok/s · TTFT ${l.c.ttft < 10 ? l.c.ttft.toFixed(1) : Math.round(l.c.ttft)}s`
@@ -372,14 +367,6 @@ export class App extends Component<{}, St> {
     }
     this.setState(st)
   }
-
-  // once per visitor, a beat after the first run finishes naturally (not on Stop) so the result lands first
-  maybeStarPopup() {
-    try { if (localStorage.getItem('llmspeed-star-popup')) return; localStorage.setItem('llmspeed-star-popup', '1') } catch (e) { return }
-    this._popT = setTimeout(() => { this.setState({ starPopup: true }); track('star-popup-shown') }, 1500)
-  }
-  closeStarPopup = () => { if (this.state.starPopup) { this.setState({ starPopup: false }); track('star-popup-dismiss') } }
-  _popKey = (e: KeyboardEvent) => { if (e.key === 'Escape') this.closeStarPopup() }
 
   stop() {
     clearInterval(this.timer)
@@ -673,8 +660,7 @@ export class App extends Component<{}, St> {
       shareLabel: s.shared ? 'Copied' : 'Share',
       repoUrl: `https://github.com/${REPO}`,
       starCount: s.stars !== null && s.stars >= STAR_COUNT_MIN ? fmtStars(s.stars) : '',
-      starClick: (button: 'nav' | 'cta' | 'popup') => { track('star-click', { button }); if (button === 'popup') this.setState({ starPopup: false }) },
-      showStarPopup: s.starPopup,
+      starClick: (button: 'nav' | 'cta') => track('star-click', { button }),
       // post-run ask: shown whenever a run has finished
       showStarCta: s.phase === 'done',
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
@@ -815,7 +801,6 @@ export class App extends Component<{}, St> {
         </div>
         {v.collapse && v.cfgOpen && <div style={v.cfgPanelStyle}>{this.renderConfigBlock(v)}</div>}
         {!v.heroMode && this.renderComposer(v)}
-        {v.showStarPopup && this.renderStarPopup(v)}
       </div>
     )
   }
@@ -853,25 +838,6 @@ export class App extends Component<{}, St> {
             </button>
           </div>
         </nav>
-    )
-  }
-
-  renderStarPopup(v: ReturnType<App['renderVals']>) {
-    return (
-      <div class="sp-backdrop" onClick={this.closeStarPopup}>
-        <div class="sp-card" role="dialog" aria-modal="true" aria-labelledby="sp-title" onClick={(e: Event) => e.stopPropagation()}>
-          <button class="sp-close hv-text-ink" onClick={this.closeStarPopup} aria-label="Close">✕</button>
-          <div class="sp-icon" aria-hidden>🤗</div>
-          <div id="sp-title" class="sp-title">Enjoying llmspeed?</div>
-          <p class="sp-text">It's free and open source. A star on GitHub helps other people find it and keeps the benchmarks coming.</p>
-          <a href={v.repoUrl} target="_blank" rel="noopener" onClick={() => v.starClick('popup')} class="sp-star">
-            {STAR_ICON}
-            Star on GitHub
-            {v.starCount && <span class="sp-count">{v.starCount}</span>}
-          </a>
-          <button class="sp-later hv-text-ink" onClick={this.closeStarPopup}>Maybe later</button>
-        </div>
-      </div>
     )
   }
 
