@@ -848,7 +848,6 @@ export class App extends Component<{}, St> {
             <a href={v.repoUrl} target="_blank" rel="noopener" onClick={() => v.starClick('cta')} class="sb sb-cta">
               {STAR_ICON}
               <span class="sb-label">Star on GitHub</span>
-              {v.starCount && <span class="sb-count">{v.starCount}</span>}
             </a>
           </div>
     )

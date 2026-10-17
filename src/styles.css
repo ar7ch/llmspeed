@@ -63,7 +63,6 @@ textarea:focus,select:focus,button:focus{outline:none}
 .sb-label{background:linear-gradient(105deg,var(--c-text-strong) 20%,oklch(0.62 0.17 30) 40%,oklch(0.72 0.15 45) 50%,oklch(0.62 0.17 30) 60%,var(--c-text-strong) 80%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:feelGradient 7s ease-in-out infinite}
 .sb-star{color:oklch(0.78 0.16 75)}
 .sb-count{display:inline-flex;align-items:center;gap:4px;padding-left:8px;border-left:1px solid var(--c-border);font-family:'IBM Plex Mono',monospace;font-size:12px}
-.sb-cta .sb-count{padding-left:0;border-left:none;color:var(--c-text-faint)}
 @keyframes sbBorder{0%,100%{background-position:0 0,0% 50%}50%{background-position:0 0,100% 50%}}
 @media (hover:hover){.sb:hover{box-shadow:0 2px 12px oklch(0.7 0.16 50 / .25)}}
 
