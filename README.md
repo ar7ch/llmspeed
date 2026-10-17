@@ -8,7 +8,7 @@ Pick a GPU or Mac and a model, and watch the answer stream at the real speed, in
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Deploy](https://github.com/nicorobinreal/llmspeed/actions/workflows/deploy.yml/badge.svg)](https://github.com/nicorobinreal/llmspeed/actions/workflows/deploy.yml)
 
-<!-- DEMO VIDEO: edit this file on github.com, drag the .mp4 onto this line, and replace this comment with the URL GitHub inserts -->
+https://github.com/user-attachments/assets/534b4736-6b59-426e-bc0a-e93a196156b9
 
 *RTX 5090 vs Mac Studio M5 Ultra 512GB on GLM-5.3 Flash (Q8). The 5090 can't load it.*
 
