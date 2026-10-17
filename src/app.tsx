@@ -2,6 +2,7 @@ import { Component, type ComponentChild } from 'preact'
 import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type Fit } from './calc'
 import { track } from './analytics'
+import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
 
 // Design knobs — values match the mockup's exported defaults (Tokens Simulator v3).
 const CONFIG = {
@@ -16,6 +17,9 @@ const CONFIG = {
 }
 
 const REPO = 'nicorobinreal/llmspeed'
+// search landing page this URL maps to (e.g. /llama-3.1-8b-on-rtx-4090/); 'home' for the root
+const PAGE = typeof location !== 'undefined' ? pageFromPath(location.pathname) : pageFromPath('/')
+const PAGE_META = pageMeta(PAGE)
 // below this the count reads as anti-social-proof, so the pills just say "Star"
 const STAR_COUNT_MIN = 50
 const STAR_ICON = <svg class="sb-star" viewBox="0 0 16 16" width={14} height={14} fill="currentColor"><path d="M8 .9l2.2 4.5 4.9.7-3.6 3.5.9 4.9L8 12.2l-4.4 2.3.9-4.9L.9 6.1l4.9-.7z" /></svg>
@@ -58,6 +62,8 @@ export class App extends Component<{}, St> {
       isMobile: typeof matchMedia !== 'undefined' && matchMedia('(max-width:640px)').matches, cfgOpen: false, composerH: 140,
       pendingShare: false, stars: null, starPopup: false,
     }
+    const pc = pageCfg(PAGE, base.cfgs[0])
+    if (pc) base.cfgs = [pc]
     // share links are applied before the first render so the hero never flashes
     try {
       const qs = new URLSearchParams(location.search)
@@ -742,7 +748,7 @@ export class App extends Component<{}, St> {
         <div class="page-col" style={`flex:1; display:flex; flex-direction:column; width:100%; max-width:${v.maxW}; margin:0 auto`}>
           {v.heroMode && (
             <div style={v.heroWrapStyle}>
-              <h1 class="hero-title" style="font-weight:700; letter-spacing:-0.03em; margin:0 0 12px; color:var(--c-ink); transition:color .8s ease">How fast will your local model {v.feelWord}?</h1>
+              <h1 class="hero-title" style="font-weight:700; letter-spacing:-0.03em; margin:0 0 12px; color:var(--c-ink); transition:color .8s ease">{PAGE_META.h1[0]} {v.feelWord}{PAGE_META.h1[1] === '?' ? '?' : ` ${PAGE_META.h1[1]}`}</h1>
               <p class="hero-sub" style="color:var(--c-text-muted); margin:0; line-height:1.55">Pick hardware and a model.<br class="hero-sub-br" /> Feel the real speed before you buy.</p>
             </div>
           )}
@@ -805,6 +811,7 @@ export class App extends Component<{}, St> {
           {v.showHeroSpacer && <div style="height:61px; flex-shrink:0"></div>}
         </div>
         </div>
+        {v.heroMode && <SeoSection page={PAGE} />}
         </div>
         {v.collapse && v.cfgOpen && <div style={v.cfgPanelStyle}>{this.renderConfigBlock(v)}</div>}
         {!v.heroMode && this.renderComposer(v)}

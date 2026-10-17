@@ -22,11 +22,14 @@
   <!-- theme before first paint: saved choice, else the system setting (avoids a light flash for dark-mode users) -->
   <script>
     (function () {
+      document.documentElement.classList.add('js')
       var t = null; try { t = localStorage.getItem('dryrun-theme') } catch (e) { }
       var d = t ? t === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
       if (d) { document.documentElement.classList.add('theme-dark'); document.querySelector('meta[name="theme-color"]').setAttribute('content', '#111114') }
     })()
   </script>
+  <!-- prerendered landing content is for crawlers; JS visitors get the app (which renders it too) -->
+  <style>.js .seo-pre{display:none}</style>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>" />
   <!-- Umami analytics: cookie-free; data-domains keeps local dev/preview visits out of the stats -->
   <script defer src="https://cloud.umami.is/script.js" data-website-id="16fd7996-2057-4fc9-a322-abc6029a948e" data-domains="llmspeed.dev"></script>

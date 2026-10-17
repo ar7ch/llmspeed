@@ -80,3 +80,23 @@ textarea:focus,select:focus,button:focus{outline:none}
 @media (hover:hover){.sp-star:hover{color:var(--c-bg);opacity:.88}}
 .sp-later{margin-top:8px;border:none;background:none;color:var(--c-text-muted);font-size:13px;cursor:pointer;padding:6px}
 @keyframes spFade{from{opacity:0}to{opacity:1}}
+
+/* search landing content below the hero (also the prerendered HTML) */
+.seo{width:100%;max-width:780px;margin:0 auto;padding-top:48px;padding-bottom:64px;font-size:14px;line-height:1.6;color:var(--c-text-sec)}
+.seo h2{font-size:20px;font-weight:700;letter-spacing:-0.01em;color:var(--c-ink);margin:32px 0 10px}
+.seo h2:first-child{margin-top:0}
+.seo h3{font-size:15px;font-weight:600;color:var(--c-text-strong);margin:28px 0 10px}
+.seo p{margin:0 0 12px}
+.seo strong{color:var(--c-ink)}
+.seo a{color:var(--c-text-strong);text-decoration:underline;text-decoration-color:var(--c-border-strong);text-underline-offset:3px}
+.seo a:hover{color:var(--c-ink);text-decoration-color:currentColor}
+.seo-table{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--c-border);border-radius:12px}
+.seo table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
+.seo th{text-align:left;font-weight:600;color:var(--c-text-muted);font-size:12px;background:var(--c-bg-subtle);padding:9px 12px;border-bottom:1px solid var(--c-border)}
+.seo td{padding:8px 12px;border-bottom:1px solid var(--c-border-faint);font-variant-numeric:tabular-nums}
+.seo tr:last-child td{border-bottom:none}
+.seo-links{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 20px}
+.seo-links span{color:var(--c-text-faint);font-size:12.5px}
+.seo-more{margin-top:20px!important}
+.seo-foot{margin-top:36px!important;padding-top:16px;border-top:1px solid var(--c-border-faint);font-size:12.5px;color:var(--c-text-faint)}
+.seo-pre h1{font-size:30px;text-align:center;margin:48px 16px 0;color:var(--c-ink)}

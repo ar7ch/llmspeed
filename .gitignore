@@ -7,3 +7,4 @@ data/*
 docs/
 scripts/
 .DS_Store
+.prerender/
