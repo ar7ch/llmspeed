@@ -8,3 +8,5 @@ docs/
 scripts/
 .DS_Store
 .prerender/
+.env
+.env.*
