@@ -66,3 +66,17 @@ textarea:focus,select:focus,button:focus{outline:none}
 .sb-cta .sb-count{padding-left:0;border-left:none;color:var(--c-text-faint)}
 @keyframes sbBorder{0%,100%{background-position:0 0,0% 50%}50%{background-position:0 0,100% 50%}}
 @media (hover:hover){.sb:hover{box-shadow:0 2px 12px oklch(0.7 0.16 50 / .25)}}
+
+/* one-time star modal after the first finished run */
+.sp-backdrop{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.35);animation:spFade .25s ease both}
+.sp-card{position:relative;width:min(380px,100%);background:var(--c-bg);border:1px solid var(--c-border);border-radius:20px;padding:28px 24px 18px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:bubbleIn .4s cubic-bezier(.22,.61,.36,1) both}
+.sp-close{position:absolute;top:10px;right:12px;border:none;background:none;color:var(--c-text-faint);font-size:14px;cursor:pointer;padding:6px}
+.sp-icon{font-size:44px;line-height:1;margin-bottom:12px}
+.sp-title{font-size:19px;font-weight:700;letter-spacing:-0.01em;color:var(--c-ink);margin-bottom:6px}
+.sp-text{font-size:14px;line-height:1.55;color:var(--c-text-muted);margin:0 0 18px}
+.sp-star{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:10px 16px;border-radius:99px;background:var(--c-ink);color:var(--c-bg);font-size:14px;font-weight:600;text-decoration:none;transition:opacity .2s ease}
+.sp-star .sb-star{color:oklch(0.8 0.16 82)}
+.sp-count{font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.6}
+@media (hover:hover){.sp-star:hover{color:var(--c-bg);opacity:.88}}
+.sp-later{margin-top:8px;border:none;background:none;color:var(--c-text-muted);font-size:13px;cursor:pointer;padding:6px}
+@keyframes spFade{from{opacity:0}to{opacity:1}}
