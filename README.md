@@ -83,6 +83,15 @@ Built with [Vite](https://vite.dev), [Preact](https://preactjs.com) and TypeScri
 - **Estimates, not guarantees.** Drivers, engine versions, flash attention, power limits and thermals can all move real numbers by 10–30%.
 - **Projected numbers** for unreleased hardware will be replaced with measurements as they appear.
 
+## Star history
+
+<a href="https://star-history.com/#nicorobinreal/llmspeed&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nicorobinreal/llmspeed&type=Date&theme=dark" />
+    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=nicorobinreal/llmspeed&type=Date" />
+  </picture>
+</a>
+
 ## License
 
 [MIT](LICENSE). Benchmark data credits go to the r/LocalLLaMA and localscore.ai communities and everyone who has shared their numbers.
