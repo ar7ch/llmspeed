@@ -203,7 +203,9 @@ export const HW: Hw[] = [...DATA.hardware].sort((a, b) => a.popularity_rank - b.
 /** models released before this are hidden: they sit at the bottom of every 2026 benchmark. Their data stays
  *  in the JSON, and the speed calibration constants were fitted with them */
 export const MIN_RELEASED = '2025-12-01'
-export const MODELS: Model[] = DATA.models.filter(m => (DATA.released?.[m.id] ?? '') >= MIN_RELEASED).sort((a, b) => a.popularity_rank - b.popularity_rank)
+/** superseded by newer models of the same size that score higher (Qwen 3.6, Gemma 4) */
+const SUPERSEDED = new Set(['qwen3-coder-next', 'devstral-small-2-24b', 'devstral-2-123b'])
+export const MODELS: Model[] = DATA.models.filter(m => (DATA.released?.[m.id] ?? '') >= MIN_RELEASED && !SUPERSEDED.has(m.id)).sort((a, b) => a.popularity_rank - b.popularity_rank)
 export const PROMPT_PRESET_TOKS: number[] = DATA.prompt_presets
 
 /** Kimi ships native INT4, GPT-OSS and MiMo native MXFP4 weights, so their 4-bit files are full quality */
