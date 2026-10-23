@@ -372,6 +372,115 @@
    "context_max": 131072,
    "popularity_rank": 25,
    "pinned": false
+  },
+  {
+   "id": "mimo-v2.6-pro",
+   "name": "MiMo-V2.6-Pro",
+   "family": "mimo",
+   "total_params_b": 1020,
+   "active_params_b": 42,
+   "kv_gb_per_8k": 0.419,
+   "quants": {
+    "q2_k": {
+     "file_gb": 418.8
+    },
+    "mxfp4": {
+     "file_gb": 554.2
+    }
+   },
+   "context_max": 1048576,
+   "popularity_rank": 26,
+   "pinned": false
+  },
+  {
+   "id": "mimo-v2.6-flash",
+   "name": "MiMo-V2.6-Flash",
+   "family": "mimo",
+   "total_params_b": 309,
+   "active_params_b": 15,
+   "kv_gb_per_8k": 0.189,
+   "quants": {
+    "q2_k_s": {
+     "file_gb": 105.9
+    },
+    "iq2_m": {
+     "file_gb": 107.8
+    },
+    "q2_k": {
+     "file_gb": 126.4
+    },
+    "iq3_s": {
+     "file_gb": 146.8
+    },
+    "mxfp4": {
+     "file_gb": 167.4
+    }
+   },
+   "context_max": 1048576,
+   "popularity_rank": 27,
+   "pinned": false
+  },
+  {
+   "id": "minimax-m3",
+   "name": "MiniMax-M3",
+   "family": "minimax",
+   "total_params_b": 428,
+   "active_params_b": 23,
+   "kv_gb_per_8k": 1.007,
+   "quants": {
+    "iq1_s": {
+     "file_gb": 90.5
+    },
+    "ud-iq1_m": {
+     "file_gb": 129.3
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 143.9
+    },
+    "q3_k_m": {
+     "file_gb": 196.6
+    },
+    "mxfp4": {
+     "file_gb": 257.4
+    },
+    "q4_k_m": {
+     "file_gb": 261.3
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 265.8
+    },
+    "q6_k": {
+     "file_gb": 369.4
+    },
+    "q8_0": {
+     "file_gb": 453.6
+    }
+   },
+   "context_max": 1048576,
+   "popularity_rank": 28,
+   "pinned": false
+  },
+  {
+   "id": "minimax-m3.1-flash",
+   "name": "MiniMax-M3.1-Flash",
+   "family": "minimax",
+   "total_params_b": 428,
+   "active_params_b": 23,
+   "kv_gb_per_8k": 1.007,
+   "quants": {
+    "q2_k": {
+     "file_gb": 155.9
+    },
+    "q3_k_m": {
+     "file_gb": 203.5
+    },
+    "q4_k_m": {
+     "file_gb": 258.0
+    }
+   },
+   "context_max": 1048576,
+   "popularity_rank": 29,
+   "pinned": false
   }
  ],
  "links": {
@@ -1105,6 +1214,125 @@
    "sources": [
     "https://llm-benchmark.de/benchmark/run-20260922-081655-b20a2b"
    ]
+  },
+  "mac-studio-m3-ultra-512gb|minimax-m3|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    26.01,
+    31.79
+   ],
+   "prefill_tps": [
+    [
+     308.8,
+     377.4
+    ],
+    [
+     308.8,
+     377.4
+    ],
+    [
+     308.8,
+     377.4
+    ],
+    [
+     247.0,
+     301.9
+    ]
+   ],
+   "sources": [
+    "https://omlx.ai/benchmarks/performance/ft6qrk1f"
+   ],
+   "ran": "MLX 4-bit (oMLX)"
+  },
+  "mac-studio-m3-ultra-512gb|mimo-v2.6-flash|mxfp4": {
+   "tier": "measured",
+   "gen_tps": [
+    45.99,
+    56.21
+   ],
+   "prefill_tps": [
+    [
+     483.5,
+     590.9
+    ],
+    [
+     483.5,
+     590.9
+    ],
+    [
+     483.5,
+     590.9
+    ],
+    [
+     386.8,
+     472.7
+    ]
+   ],
+   "sources": [
+    "https://omlx.ai/benchmarks/performance/n3lbryr0"
+   ],
+   "ran": "MLX 4-bit (oMLX)"
+  },
+  "mac-studio-m3-ultra-512gb|mimo-v2.6-pro|q2_k": {
+   "tier": "measured",
+   "gen_tps": [
+    21.24,
+    25.96
+   ],
+   "prefill_tps": [
+    [
+     134.4,
+     164.2
+    ],
+    [
+     134.4,
+     164.2
+    ],
+    [
+     134.4,
+     164.2
+    ],
+    [
+     107.5,
+     131.4
+    ]
+   ],
+   "sources": [
+    "https://omlx.ai/benchmarks/performance/zpqt5ych"
+   ],
+   "ran": "MLX 3-bit (oMLX oQ3e)"
+  },
+  "ryzen-ai-max-395-128gb|mimo-v2.6-flash|q2_k_s": {
+   "tier": "measured",
+   "gen_tps": [
+    21.23,
+    25.95
+   ],
+   "prefill_tps": [
+    [
+     161.9,
+     197.8
+    ],
+    [
+     161.9,
+     197.8
+    ],
+    [
+     161.9,
+     197.8
+    ],
+    [
+     129.5,
+     158.2
+    ]
+   ],
+   "sources": [
+    "https://huggingface.co/petr567/MiMo-V2.6-Flash-MOPD-Strix-Halo-Recipe"
+   ],
+   "tested": [
+    "MiMo-V2.6-Flash MOPD"
+   ],
+   "ran": "an IQ2_XXS/XS mix (88.8 GB)"
   }
  },
  "cluster_runs": [
@@ -1538,7 +1766,10 @@
    "aa_index": 44.8,
    "_note": "reasoning effort max; AA's own TB 2.1 run gives 83.9; LMArena lists only the max-reasoning variant",
    "arena_text": 1480.7,
-   "arena_webdev": 1622.7
+   "arena_webdev": 1622.7,
+   "_vendor": [
+    "tb21"
+   ]
   },
   "nemotron-3.5-lightning-30b-a3b": {
    "tb21": 24.6,
@@ -1607,6 +1838,46 @@
    "tau3_banking": 4.5,
    "aa_index": 8.6,
    "_note": "AA index is an AA estimate"
+  },
+  "mimo-v2.6-pro": {
+   "tb21": 89.9,
+   "aa_index": 46.3,
+   "deepswe_v11": 71.9,
+   "arena_text": 1479.5,
+   "arena_webdev": 1625.4,
+   "_note": "reasoning; Arena Text has only 4,067 votes",
+   "_vendor": [
+    "tb21",
+    "deepswe_v11"
+   ]
+  },
+  "mimo-v2.6-flash": {
+   "tb21": 87.6,
+   "aa_index": 37.9,
+   "deepswe_v11": 67.9,
+   "arena_text": 1448.1,
+   "arena_webdev": 1634.0,
+   "_vendor": [
+    "tb21",
+    "deepswe_v11"
+   ]
+  },
+  "minimax-m3": {
+   "tb21": 65.2,
+   "aa_index": 29.2,
+   "tau3_banking": 15.3,
+   "arena_text": 1439.8,
+   "arena_webdev": 1482.4,
+   "_note": "TB 2.1 is AA's own run; MiniMax reports 66.0"
+  },
+  "minimax-m3.1-flash": {
+   "aa_index": 42.7,
+   "deepswe_v11": 73.7,
+   "arena_webdev": 1589.7,
+   "_note": "Arena WebDev has only 2,164 votes",
+   "_vendor": [
+    "deepswe_v11"
+   ]
   }
  },
  "released": {
@@ -1634,7 +1905,11 @@
   "mistral-small-3.2-24b": "2025-06-20",
   "devstral-small-2-24b": "2025-12-09",
   "devstral-2-123b": "2025-12-09",
-  "magistral-small-2509": "2025-09-17"
+  "magistral-small-2509": "2025-09-17",
+  "mimo-v2.6-pro": "2026-09-21",
+  "mimo-v2.6-flash": "2026-09-21",
+  "minimax-m3": "2026-06-12",
+  "minimax-m3.1-flash": "2026-10-19"
  },
  "long_context": {
   "from_tokens": 12500,
@@ -1653,7 +1928,9 @@
    "qwen3.6-27b",
    "qwen3.6-35b-a3b",
    "qwen3.5-9b",
-   "qwen3-coder-next"
+   "qwen3-coder-next",
+   "mimo-v2.6-pro",
+   "mimo-v2.6-flash"
   ],
   "sources": [
    "https://www.hardware-corner.net/gpu-llm-benchmarks/rtx-pro-6000-blackwell/",

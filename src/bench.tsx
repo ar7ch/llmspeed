@@ -2,7 +2,7 @@
 // that run on the selected setup in the accent color. Scores are for full-precision weights;
 // quantization costs some of it (see the quant notes).
 import { Component } from 'preact'
-import { BENCHES, HW, MODELS, type Bench, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
+import { BENCHES, HW, MODELS, type Bench, isVendorScore, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type KvQ } from './calc'
 
 const ACCENT = 'oklch(0.62 0.17 30)'
@@ -14,6 +14,8 @@ const BY_GB = [...HW].sort((a, b) => b.vram_gb - a.vram_gb || a.popularity_rank 
 
 /** 1- or 2-bit quants: these lose real quality, so a published full-precision score overstates them */
 const lowBits = (q: Quant) => /iq1/.test(q.id) ? 1 : /q2|iq2/.test(q.id) ? 2 : 0
+
+const VENDOR = "self-reported by the model's maker, not an independent run"
 
 /** scores keep their published precision (89.2, not 89) */
 export const fmtScore = (x: number) => x.toFixed(1).replace(/\.0$/, '')
@@ -34,8 +36,8 @@ function bestRun(hw: Hw, n: number, m: Model, ctx: number, kvq: KvQ): { q: Quant
 // TODO: rule-of-thumb factors, replace with per-model quantized eval results if they get published
 export function quantKeep(q: Quant, m: Model): number {
   const p = m.total_params_b
-  // NOTE: Kimi ships native INT4 and GPT-OSS native MXFP4 weights, so their 4-bit files are full quality
-  if (/kimi|gpt-oss/.test(m.id) && /q4|mxfp4/.test(q.id)) return 1
+  // NOTE: Kimi ships native INT4 and GPT-OSS and MiMo native MXFP4 weights, so their 4-bit files are full quality
+  if (/kimi|gpt-oss|mimo/.test(m.id) && /q4|mxfp4/.test(q.id)) return 1
   if (/iq1/.test(q.id)) return p >= 400 ? 0.78 : 0.4
   if (/q2|iq2/.test(q.id)) return p >= 200 ? 0.92 : 0.75
   if (/q3|iq3/.test(q.id)) return p >= 100 ? 0.96 : 0.92
@@ -123,7 +125,7 @@ export class BenchChart extends Component<Props, St> {
               <div style="flex:1; min-width:0">
                 <div style={`font-size:${i ? 13.5 : 17}px; font-weight:${i ? 500 : 650}; color:var(--c-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap`}>{i ? `${i + 1}. ` : ''}{p.m.name} <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:400; color:var(--c-text-muted)">{p.q.label}</span></div>
                 <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:4px">
-                  <span class="chip">{fmtScore(p.s)}{b.unit} published</span>
+                  <span class="chip">{fmtScore(p.s)}{b.unit} {isVendorScore(p.m.id, b.id) ? 'self-reported' : 'published'}</span>
                   {p.adj < p.s - 0.05 && <span class="chip chip-warn">~{fmtScore(p.adj)} after {p.q.label}</span>}
                   <span class={`chip ${p.c.base >= 20 ? 'chip-good' : 'chip-warn'}`}>{fmt(p.c.base)} tok/s</span>
                   <span class={`chip ${p.c.total / p.c.usable > 0.9 ? 'chip-warn' : ''}`}>{p.c.total.toFixed(0)} of {p.c.usable.toFixed(0)} GB</span>
@@ -150,7 +152,7 @@ export class BenchChart extends Component<Props, St> {
                 <span style={`font-size:12.5px; color:${sel ? 'var(--c-ink)' : 'var(--c-text-sec)'}; font-weight:${sel ? 600 : 400}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap`}>{r.m.name}</span>
                 <span style="display:flex; align-items:center; gap:6px; min-width:0">
                   <span style={`height:14px; width:${w}%; border-radius:0 4px 4px 0; background:${fill}; ${lb ? `box-shadow:inset 0 0 0 1px ${ACCENT};` : ''} opacity:${r.c.fit === 'partial' ? 0.5 : 1}; flex-shrink:0`}></span>
-                  <span style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--c-text-strong)">{fmtScore(r.s!)}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--c-text-strong)" title={isVendorScore(r.m.id, b.id) ? VENDOR : undefined}>{fmtScore(r.s!)}{isVendorScore(r.m.id, b.id) && '*'}</span>
                 </span>
                 <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-muted); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
                   {r.c.fit === 'no' ? `needs ${Math.round(r.c.total)} GB` : `${fmt(r.c.base)} tok/s${lb ? ` · ${lb}-bit` : r.c.fit === 'partial' ? ' · offload' : ''}`}
@@ -161,7 +163,7 @@ export class BenchChart extends Component<Props, St> {
         </div>
         <div style="min-height:40px; margin-top:10px; font-size:12.5px; color:var(--c-text-sec); line-height:1.5">
           {hv ? <>
-            <strong style="color:var(--c-ink)">{hv.m.name}</strong>{releasedLabel(hv.m.id) && ` (${releasedLabel(hv.m.id)})`}: {fmtScore(hv.s!)}{b.unit} on {b.short}{scoresOf(hv.m.id)._note ? ` (${scoresOf(hv.m.id)._note})` : ''}.{' '}
+            <strong style="color:var(--c-ink)">{hv.m.name}</strong>{releasedLabel(hv.m.id) && ` (${releasedLabel(hv.m.id)})`}: {fmtScore(hv.s!)}{b.unit} on {b.short}{scoresOf(hv.m.id)._note ? ` (${scoresOf(hv.m.id)._note})` : ''}{isVendorScore(hv.m.id, b.id) ? `, ${VENDOR}` : ''}.{' '}
             {hv.c.fit === 'no' ? `Needs ${hv.c.total.toFixed(0)} GB even at ${hv.q.label}; ${setupName(hw, n)} has ${hv.c.usable.toFixed(0)} GB usable.`
               : `${lowBits(hv.q) ? `Only fits at ${hv.q.label}, a ${lowBits(hv.q)}-bit quant: expect a clearly lower score than the full-precision one shown. ` : ''}Runs at ${hv.q.label}: ${fmt(hv.c.lo)}–${fmt(hv.c.hi)} tok/s, ${hv.c.total.toFixed(0)} of ${hv.c.usable.toFixed(0)} GB${hv.c.fit === 'partial' ? ', part offloaded to system RAM' : ''}.`}
           </> : <span style="color:var(--c-text-muted)">{b.note} <a href={b.url} target="_blank" rel="noopener" style="color:var(--c-text-sec)">Source</a></span>}
@@ -173,7 +175,7 @@ export class BenchChart extends Component<Props, St> {
           return <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">{macLimitNote(hw, n)}{more > 0 && ` That would let ${more} more model${more > 1 ? 's' : ''} here fit.`}</p>
         })()}
         <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Showing models and benchmark editions released in 2026; {MODELS.length - CURRENT.length} older models are hidden.</p>
-        <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Scores are vendor-reported or from Artificial Analysis, at full precision. Quantization lowers them a little at Q4 and a lot below Q3 on small models.</p>
+        <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Scores come from Artificial Analysis, LMArena, benchmark leaderboards and model makers, at full precision; * marks a score {VENDOR}. Quantization lowers them a little at Q4 and a lot below Q3 on small models.</p>
       </section>
     )
   }

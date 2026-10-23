@@ -1,5 +1,5 @@
 import { Component, type ComponentChild } from 'preact'
-import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
+import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, isVendorScore, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
@@ -550,7 +550,7 @@ export class App extends Component<{}, St> {
         mm => mcalc(mm).fit,
         mm => ({ name: mm.name, meta: [s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
           : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
-          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, ctxLabel(mm.context_max), releasedLabel(mm.id)].filter(Boolean).map(x => x.replace(/ /g, '\u00a0')).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
+          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!) + (isVendorScore(mm.id, s.bench) ? '*' : '')) : `${mm.total_params_b} B`, ctxLabel(mm.context_max), releasedLabel(mm.id)].filter(Boolean).map(x => x.replace(/ /g, '\u00a0')).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
       quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n, s.kvq).fit })).map(({ qq, fit }) => ({
         name: qq.label, meta: [quantNote(qq.id, m.total_params_b), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
         fitColor: fit === 'no' ? fitColors.no : fit === 'partial' ? fitColors.partial : '',
@@ -630,6 +630,7 @@ export class App extends Component<{}, St> {
       sources: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.sources ?? [] : [],
       macNote: r._hw.vendor === 'apple' ? macLimitNote(r._hw, r._c.n) : '',
       tested: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.tested?.join(', ') ?? '' : '',
+      ran: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.ran ?? '' : '',
       runs: clusterRuns(r._hw.id, r._m.id).map(x => ({ label: `${x.n}× · ${x.engine} · ${x.link} · ${x.quant}${x.tested ? ` (tested: ${x.tested})` : ''}`, v: `${fmt(x.gen_tps)} tok/s`, href: x.source })) }))
     let suggShow = false, suggLabel = '', suggQ: string | null = null
     if (!compare && c0.fit !== 'fits') {
@@ -1053,6 +1054,7 @@ export class App extends Component<{}, St> {
                         <span style="display:inline-flex; align-items:center; gap:4px"><span style="width:7px; height:7px; border-radius:50%; background:oklch(0.55 0.15 155)"></span>top third</span>
                         <span style="display:inline-flex; align-items:center; gap:4px"><span style="width:7px; height:7px; border-radius:50%; background:oklch(0.68 0.13 75)"></span>lower</span>
                         <span style="display:inline-flex; align-items:center; gap:4px"><span style="width:7px; height:7px; border-radius:50%; border:1.5px solid var(--c-border-strong)"></span>too slow</span>
+                        <span title="self-reported by the model's maker, not an independent run">* self-reported score</span>
                       </div>
                       <div style="overflow-y:auto; display:flex; flex-direction:column">
                         {r.modelOpts.length === 0 && <div style="padding:10px; font-size:12.5px; color:var(--c-text-muted)">No model matches "{r.modelQ}"</div>}
@@ -1205,6 +1207,7 @@ export class App extends Component<{}, St> {
                       <div style="margin-top:10px; font-size:12px; color:var(--c-text-muted)">
                         Measured: {sec.sources.map((u, j) => <a key={j} href={u} target="_blank" rel="noopener" style="color:var(--c-text-sec); margin-right:8px">[{j + 1}]</a>)}
                         {sec.tested && <span> · some runs used {sec.tested} (same architecture and size)</span>}
+                        {sec.ran && <span> · measured with {sec.ran}, not this exact file</span>}
                       </div>
                     )}
                     {sec.macNote && <div style="margin-top:10px; font-size:12px; line-height:1.5; color:var(--c-text-muted)">{sec.macNote}</div>}

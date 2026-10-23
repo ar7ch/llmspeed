@@ -69,6 +69,8 @@ export interface ComboPred {
   sources?: string[]
   /** same-architecture models some of those measurements actually ran */
   tested?: string[]
+  /** the file format the measurement ran, when it isn't this catalog quant (e.g. MLX 4-bit) */
+  ran?: string
 }
 
 /** a measured multi-device run, shown next to the projection; quant is free text because
@@ -110,8 +112,9 @@ export interface Bench {
   axis?: 'elo'
 }
 
-/** published scores per model id; `_note` says which variant or mode the scores belong to */
-export type Scores = Record<string, number | string | undefined> & { _note?: string }
+/** published scores per model id; `_note` says which variant or mode the scores belong to,
+ *  `_vendor` lists the benchmark ids whose score only the model's maker has reported */
+export type Scores = Record<string, number | string | string[] | undefined> & { _note?: string; _vendor?: string[] }
 
 /** throughput past the longest prompt preset falls as (1 + from/K) / (1 + ctx/K) */
 export interface LongCtx {
@@ -228,6 +231,8 @@ export const releasedLabel = (modelId: string) => {
   return d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''
 }
 export const scoresOf = (modelId: string): Scores => DATA.scores?.[modelId] ?? {}
+/** the score is self-reported by the model's maker, not an independent run */
+export const isVendorScore = (modelId: string, benchId: string) => scoresOf(modelId)._vendor?.includes(benchId) ?? false
 
 export const clusterRuns = (hwId: string, modelId: string) =>
   (DATA.cluster_runs ?? []).filter(r => r.hw === hwId && r.model === modelId).sort((a, b) => a.n - b.n)
