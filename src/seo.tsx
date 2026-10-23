@@ -8,7 +8,12 @@ import { GuideSection } from './guide'
 import { HW, MODELS, PRESETS, quantsFor, releasedLabel, type Hw, type Model, type Quant } from './data'
 import { calc, DEFAULT_OPTS, fmt, type CalcResult, type Opts } from './calc'
 
-export const SITE = 'https://llmspeed.dev'
+/** public site URL without a trailing slash; the Pages workflow sets it for forks */
+export const SITE: string = (import.meta.env.VITE_SITE_URL || 'https://llmspeed.dev').replace(/\/$/, '')
+/** root path of the site: '/' locally and on a custom domain, '/<repo>/' on a GitHub project page */
+export const BASE: string = import.meta.env.VITE_BASE_PATH || '/'
+/** link to a page under the site's base path */
+export const hrefOf = (p: Page) => BASE + pathOf(p).slice(1)
 
 export type Page =
   | { kind: 'home' }
@@ -26,6 +31,7 @@ export function pathOf(p: Page): string {
 }
 
 export function pageFromPath(path: string): Page {
+  if (BASE !== '/' && path.startsWith(BASE)) path = path.slice(BASE.length - 1)
   const seg = path.replace(/^\/+|\/+$/g, '').split('/')
   if (seg.length === 2 && seg[0] === 'hardware') {
     const hw = HW.find(h => h.id === seg[1])
@@ -170,7 +176,7 @@ export function pageMeta(p: Page): PageMeta {
 
 /** query string with the visitor's non-default settings, so links between pages keep them */
 const SettingsQuery = createContext('')
-const A = ({ p, children }: { p: Page; children: ComponentChildren }) => <a href={pathOf(p) + useContext(SettingsQuery)}>{children}</a>
+const A = ({ p, children }: { p: Page; children: ComponentChildren }) => <a href={hrefOf(p) + useContext(SettingsQuery)}>{children}</a>
 
 function LinkList({ items }: { items: { p: Page; label: string; meta?: string }[] }) {
   return (
@@ -254,7 +260,7 @@ function ModelSection({ m, o }: { m: Model; o: Opts }) {
 function HomeSection() {
   return (
     <>
-      <p><a href="/guide/">How many tokens per second do you need, and what quantization costs</a></p>
+      <p><a href={`${BASE}guide/`}>How many tokens per second do you need, and what quantization costs</a></p>
       <h2>Browse by hardware</h2>
       <LinkList items={HW.map(hw => ({ p: { kind: 'hw', hw }, label: hw.name }))} />
       <h2>Browse by model</h2>

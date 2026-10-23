@@ -2,7 +2,7 @@ import { Component, type ComponentChild } from 'preact'
 import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, macCanRaise, macUsable, BENCHES, scoresOf, isVendorScore, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ, type Opts } from './calc'
 import { track } from './analytics'
-import { pageFromPath, pageMeta, pageCfg, SeoSection, settingsQuery } from './seo'
+import { BASE, pageFromPath, pageMeta, pageCfg, SeoSection, settingsQuery, SITE } from './seo'
 import { BenchChart, fmtScore, rankModels } from './bench'
 import { quantNote, workloads } from './guide'
 
@@ -461,7 +461,7 @@ export class App extends Component<{}, St> {
     q.set('run', '1')
     q.set('utm_source', 'share')
     track('share')
-    const url = 'https://llmspeed.dev/?' + q.toString().replace(/%2C/g, ',')
+    const url = SITE + '/?' + q.toString().replace(/%2C/g, ',')
     ;(navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).catch(() => { })
     this.setState({ shared: true })
     clearTimeout(this._shT)
@@ -1205,9 +1205,9 @@ export class App extends Component<{}, St> {
                   </div>
                 )}
                 <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px">
-                  <a href="/guide/" class="pill-link">What these mean</a>
-                  <a href={`/hardware/${v.cfgRows[0]._hw.id}/${v.settingsQuery}#fit`} class="pill-link">Every model on this hardware →</a>
-                  <a href={`/models/${v.cfgRows[0]._m.id}/${v.settingsQuery}#fit`} class="pill-link">Hardware that runs this model →</a>
+                  <a href={`${BASE}guide/`} class="pill-link">What these mean</a>
+                  <a href={`${BASE}hardware/${v.cfgRows[0]._hw.id}/${v.settingsQuery}#fit`} class="pill-link">Every model on this hardware →</a>
+                  <a href={`${BASE}models/${v.cfgRows[0]._m.id}/${v.settingsQuery}#fit`} class="pill-link">Hardware that runs this model →</a>
                 </div>
               </div>
             )}

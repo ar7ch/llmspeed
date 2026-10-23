@@ -1,7 +1,9 @@
 // SSR entry for the static landing pages; prerender.mjs runs the built module after `vite build`
 // and writes the returned files into dist/. Kept free of Node APIs so it typechecks with the app.
 import { renderToString } from 'preact-render-to-string'
-import { allPages, pageMeta, pathOf, SeoSection, SITE, type Page } from './seo'
+import { allPages, BASE, pageMeta, pathOf, SeoSection, SITE, type Page } from './seo'
+
+export { SITE }
 
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -31,7 +33,9 @@ export function pages(template: string): { file: string; html: string }[] {
     const body = renderToString(<div class="seo-pre"><h1>{h1}</h1><SeoSection page={p} /></div>)
     const html = template
       // nested pages need root-relative asset URLs (vite emits ./ for base './')
-      .replace(/(src|href)="\.\//g, '$1="/')
+      .replace(/(src|href)="\.\//g, `$1="${BASE}`)
+      // the template's absolute URLs name the upstream domain; forks deploy elsewhere
+      .split('https://llmspeed.dev').join(SITE)
       .replace(/<title>[^<]*<\/title>/, `<title>${esc(meta.title)}</title>`)
       .replace(/(<meta name="description" content=")[^"]*/, `$1${esc(meta.description)}`)
       .replace(/(<link rel="canonical" href=")[^"]*/, `$1${url}`)
