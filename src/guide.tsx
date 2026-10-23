@@ -42,7 +42,8 @@ export function workloads(c: CalcResult, at: (ctx: number) => CalcResult, contex
     { label: 'Coding help', head: cap(band(t, [5, 10, 20, 40], ['unusable', 'sluggish', 'usable', 'good', 'great'])),
       detail: `writes a 300-line file (~3K tokens) in ${secs(3000 / t)}`, good: t >= 10 },
     agent
-      ? { label: 'Agentic coding', head: cap(band(agent.base, [10, 20, 40, 80], ['too slow', 'slow', 'workable', 'good', 'great'])),
+      // a rating at a short depth reads faster than one at 256K, so the headline names the depth
+      ? { label: 'Agentic coding', head: cap(band(agent.base, [10, 20, 40, 80], ['too slow', 'slow', 'workable', 'good', 'great'])) + (depth < AGENT_CTX ? ` at ${ctxK(depth)}` : ''),
           detail: `${ctxK(maxCtx)} max context${maxCtx < AGENT_CTX ? ' (256K recommended)' : ''}; ${fmt(agent.base)} tok/s at ${ctxK(depth)}, first read ${secs(agent.ttft)}`,
           // the first full read is a one-time cost; cached turns run at decode speed, so that decides
           good: maxCtx >= AGENT_CTX && agent.base >= 20 }
