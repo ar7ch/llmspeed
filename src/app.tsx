@@ -1,6 +1,6 @@
 import { Component, type ComponentChild } from 'preact'
 import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
-import { calc, fmt, type CalcResult, type Fit } from './calc'
+import { calc, fmt, RUNTIME_GB, type CalcResult, type Fit } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
 import { BenchChart, fmtScore, rankModels } from './bench'
@@ -572,7 +572,7 @@ export class App extends Component<{}, St> {
       tipFitOn: () => this.setState({ tip: 'fit' + i }),
       fitHelp: c.fit === 'fits' ? `Model + context (${c.total.toFixed(1)} GB) fits in the ${c.usable.toFixed(1)} GB of usable memory — full speed.`
         : c.fit === 'partial' ? `Needs ${c.total.toFixed(1)} GB, only ${c.usable.toFixed(1)} GB fits on the GPU. ~${Math.round((1 - c.gpuShare) * 100)}% of the weights are served from system RAM instead — that share streams at RAM speed and caps decode.`
-        : `Needs ${c.total.toFixed(1)} GB; only ${c.usable.toFixed(1)} GB available. Doesn't fit, can't run.`,
+        : `Needs ${(+c.w.toFixed(1) + +c.kv.toFixed(1) + RUNTIME_GB).toFixed(1)} GB (weights ${c.w.toFixed(1)} + context cache ${c.kv.toFixed(1)} + runtime ${RUNTIME_GB} GB); only ${c.usable.toFixed(1)} GB available. Doesn't fit, can't run.`,
       showRemove: compare && i === 1,
       showAddRace: !compare && CONFIG.showCompare && CONFIG.comparePlacement === 'config-row',
       _c: c, _hw: hw, _m: m, _q: q,
@@ -604,7 +604,7 @@ export class App extends Component<{}, St> {
       return c.fit === 'no' ? [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },
         { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k)`, v: `${c.kv.toFixed(1)} GB` },
-        { n: '3', f: `Total vs usable memory (${hw.vendor === 'apple' ? '75% of unified' : '93% of VRAM'}${c.n > 1 ? `, pooled over ${c.n} devices` : ''})`, v: `${c.total.toFixed(1)} / ${c.usable.toFixed(1)} GB` },
+        { n: '3', f: `Total with ${RUNTIME_GB} GB runtime vs usable memory (${hw.vendor === 'apple' ? '75% of unified' : '93% of VRAM'}${c.n > 1 ? `, pooled over ${c.n} devices` : ''})`, v: `${c.total.toFixed(1)} / ${c.usable.toFixed(1)} GB` },
         { n: '4', f: 'Result', v: "won't run" },
       ] : [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },

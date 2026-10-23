@@ -3,7 +3,7 @@
 // llama.cpp KL-divergence tables); the /guide/ page cites them. Kept free of window/document
 // access so the page prerenders.
 import type { CalcResult } from './calc'
-import { fmt } from './calc'
+import { fmt, RUNTIME_GB } from './calc'
 
 /** silent reading ≈ 238 wpm (Brysbaert 2019) ≈ 5.3 tok/s at 0.75 words per token */
 export const READING_TPS = 5.3
@@ -20,6 +20,19 @@ export interface Verdict { label: string; head: string; detail: string; good: bo
 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1)
 
+/** the memory sum behind a 256K "won't fit", plus the longest context that does fit */
+function noFit(a: CalcResult): string {
+  const gb = (x: number) => `${x.toFixed(1)} GB`
+  const r1 = (x: number) => Math.round(x * 10) / 10
+  // NOTE: the total is the sum of the rounded parts, so the shown sum adds up
+  const sum = `weights ${gb(a.w)} + 256K cache ${gb(a.kv)} + runtime ${gb(RUNTIME_GB)} = ${gb(r1(a.w) + r1(a.kv) + RUNTIME_GB)}, over the ${gb(a.usable)} usable`
+  const room = a.usable - a.w - RUNTIME_GB
+  // NOTE: KV grows linearly with context, so the room left after weights sets the longest context
+  const maxK = Math.floor(room / a.kv * (AGENT_CTX / 1024))
+  // calc() keeps at least 0.15 GB of cache at any context
+  return `${sum}; ${room < 0.15 ? 'weights and runtime leave no room for context' : `fits up to ${maxK}K context`}`
+}
+
 /** verdicts per workload for an estimate that runs. `agent` is the same setup estimated at an
  *  AGENT_CTX-token prompt (its prefill rate and memory fit) */
 export function workloads(c: CalcResult, agent: CalcResult, contextMax: number): Verdict[] {
@@ -34,7 +47,7 @@ export function workloads(c: CalcResult, agent: CalcResult, contextMax: number):
     { label: 'Agentic coding',
       head: contextMax < AGENT_CTX || agent.fit !== 'fits' ? 'Won\'t fit' : cap(band(agent.base, [10, 20, 40, 80], ['too slow', 'slow', 'workable', 'good', 'great'])),
       detail: contextMax < AGENT_CTX ? `context tops out at ${Math.round(contextMax / 1024)}K; agents need 256K`
-        : agent.fit !== 'fits' ? 'a 256K context doesn\'t fit in memory'
+        : agent.fit !== 'fits' ? noFit(agent)
         : `${fmt(agent.base)} tok/s at 256K deep; first full read ${secs(agent.ttft)}, cached turns after`,
       // the first 256K read is a one-time cost; cached turns run at decode speed, so that decides
       good: agentOk && agent.base >= 20 },

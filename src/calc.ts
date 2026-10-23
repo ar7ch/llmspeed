@@ -69,12 +69,15 @@ function comboPrefill(cb: ComboPred | undefined, ctx: number, prefillK: number):
   return mids[n - 1] * longCtx(ctx, prefillK)
 }
 
+/** CUDA/Metal context, compute buffers and other runtime memory on top of weights and KV */
+export const RUNTIME_GB = 0.6
+
 export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult {
   const co = coeffs(hw.backend)
   const w = m.quants[q.id] ? m.quants[q.id].file_gb : m.total_params_b * (FALLBACK_BPP[q.id] ?? 2)
   const kv = Math.max(0.15, m.kv_gb_per_8k * (ctx / 8192))
   const usable = (hw.vendor === 'apple' ? hw.vram_gb * 0.75 : hw.vram_gb * 0.93) * (n > 1 ? n * CLUSTER_MEM_EFF : 1)
-  const total = w + kv + 0.6
+  const total = w + kv + RUNTIME_GB
   // clusters don't offload to system RAM: the model fits in pooled memory or doesn't run
   const fit: Fit = total <= usable ? 'fits'
     : (n === 1 && hw.vendor !== 'apple' && hw.form_factor !== 'server' && total <= usable * 2.4 ? 'partial' : 'no')
