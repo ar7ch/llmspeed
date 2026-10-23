@@ -65,6 +65,25 @@ export interface ComboPred {
   gen_tps: [number, number] | null
   /** [lo, hi] tok/s per prompt-length preset (same order as prompt_presets); null if unmodeled */
   prefill_tps: [number, number][] | null
+  /** links to the measurements behind a hand-curated combo */
+  sources?: string[]
+  /** same-architecture models some of those measurements actually ran */
+  tested?: string[]
+}
+
+/** a measured multi-device run, shown next to the projection; quant is free text because
+ *  most cluster runs use engine-native formats (MLX, NVFP4, AWQ) the catalog doesn't have */
+export interface ClusterRun {
+  hw: string
+  n: number
+  link: string
+  engine: string
+  model: string
+  quant: string
+  gen_tps: number
+  /** the model actually benchmarked, when a same-architecture proxy stands in */
+  tested: string | null
+  source: string
 }
 
 /** how several identical devices are joined into one setup; factors are per doubling for
@@ -89,6 +108,7 @@ interface AppData {
   /** keyed "hardware_id|model_id|quant" */
   combos: Record<string, ComboPred>
   links?: Record<string, Link>
+  cluster_runs?: ClusterRun[]
   projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>>
 }
 
@@ -100,7 +120,9 @@ const DATA: AppData = {
   ...(raw as unknown as AppData),
   hardware: merge((raw as unknown as AppData).hardware, EXTRA.hardware),
   models: merge((raw as unknown as AppData).models, EXTRA.models),
+  combos: { ...EXTRA.combos, ...(raw as unknown as AppData).combos },
   links: EXTRA.links,
+  cluster_runs: EXTRA.cluster_runs,
   projected_decode_eff: EXTRA.projected_decode_eff,
 }
 
@@ -150,6 +172,9 @@ export const nodeCounts = (hw: Hw) => [1, 2, 4, 8].filter(n => n <= linkFor(hw).
 export const clampNodes = (hw: Hw, n: unknown) => typeof n === 'number' && nodeCounts(hw).includes(n) ? n : 1
 
 export const setupName = (hw: Hw, n: number) => n > 1 ? `${n}× ${hw.name}` : hw.name
+
+export const clusterRuns = (hwId: string, modelId: string) =>
+  (DATA.cluster_runs ?? []).filter(r => r.hw === hwId && r.model === modelId).sort((a, b) => a.n - b.n)
 
 export function combo(hwId: string, modelId: string, quantId: string): ComboPred | undefined {
   return DATA.combos[`${hwId}|${modelId}|${quantId}`]

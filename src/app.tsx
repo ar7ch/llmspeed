@@ -1,5 +1,5 @@
 import { Component, type ComponentChild } from 'preact'
-import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
+import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type Fit } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
@@ -557,11 +557,14 @@ export class App extends Component<{}, St> {
           ? `Decode: ${c.n > 1 ? 'single-device ' : ''}benchmark range for this combo × context derating`
           : `Decode ≈ bandwidth × efficiency ÷ active weights: ${hw.bandwidth_gbs} GB/s × ${c.eff} ÷ ${c.aw.toFixed(1)} GB`, v: `${fmt(c.base)} tok/s` },
         ...(c.n > 1 ? [{ n: '4b', f: `Cluster: ${c.n}× over ${linkFor(hw).label}, ${linkFor(hw).mode === 'tensor' ? 'tensor parallel' : 'layer split'}${m.active_params_b < m.total_params_b ? ' (MoE scales less)' : ''}. Decode ×${c.decF.toFixed(2)}, prefill ×${c.preF.toFixed(2)} vs one device`, v: 'projected' }] : []),
-        { n: '5', f: c.fit === 'partial' ? 'Spread: calibrated from measured offload runs (RAM speeds vary)' : c.fromCombo && c.n > 1 ? 'Spread: single-device interval × cluster scaling (projected)' : c.fromCombo ? 'Spread: holdout-validated interval' : 'Spread ±15% (engine, thermals, runtime)', v: `${fmt(c.lo)}–${fmt(c.hi)} tok/s` },
+        { n: '5', f: c.fit === 'partial' ? 'Spread: calibrated from measured offload runs (RAM speeds vary)' : c.fromCombo && c.n > 1 ? 'Spread: single-device interval × cluster scaling (projected)' : c.fromCombo && combo(hw.id, m.id, q.id)?.sources ? 'Spread: range across the linked measurements (±10% for a single one)' : c.fromCombo ? 'Spread: holdout-validated interval' : 'Spread ±15% (engine, thermals, runtime)', v: `${fmt(c.lo)}–${fmt(c.hi)} tok/s` },
         { n: '6', f: `Prefill ≈ ${Math.round(c.pre).toLocaleString()} tok/s → ${ctx.toLocaleString()} ÷ that + overhead`, v: `TTFT ${c.ttft < 10 ? c.ttft.toFixed(1) : Math.round(c.ttft)} s` },
       ]
     }
-    const breakdownSecs = rows.map((r, i) => ({ showLabel: compare, label: `${i ? 'B' : 'A'} — ${setupName(r._hw, r._c.n)} · ${r._m.name} · ${r._q.label}`, rows: mkRows(r) }))
+    const breakdownSecs = rows.map((r, i) => ({ showLabel: compare, label: `${i ? 'B' : 'A'} — ${setupName(r._hw, r._c.n)} · ${r._m.name} · ${r._q.label}`, rows: mkRows(r),
+      sources: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.sources ?? [] : [],
+      tested: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.tested?.join(', ') ?? '' : '',
+      runs: clusterRuns(r._hw.id, r._m.id).map(x => ({ label: `${x.n}× · ${x.engine} · ${x.link} · ${x.quant}${x.tested ? ` (tested: ${x.tested})` : ''}`, v: `${fmt(x.gen_tps)} tok/s`, href: x.source })) }))
     let suggShow = false, suggLabel = '', suggQ: string | null = null
     if (!compare && c0.fit !== 'fits') {
       const { hw, m, q, n } = this.resolve(s.cfgs[0])
@@ -1102,6 +1105,23 @@ export class App extends Component<{}, St> {
                         </div>
                       ))}
                     </div>
+                    {sec.sources.length > 0 && (
+                      <div style="margin-top:10px; font-size:12px; color:var(--c-text-muted)">
+                        Measured: {sec.sources.map((u, j) => <a key={j} href={u} target="_blank" rel="noopener" style="color:var(--c-text-sec); margin-right:8px">[{j + 1}]</a>)}
+                        {sec.tested && <span> · some runs used {sec.tested} (same architecture and size)</span>}
+                      </div>
+                    )}
+                    {sec.runs.length > 0 && (
+                      <div style="margin-top:12px">
+                        <div style="font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:var(--c-text-muted); margin-bottom:6px">Measured on real multi-device setups</div>
+                        {sec.runs.map((x, j) => (
+                          <div key={j} style="display:flex; gap:14px; align-items:baseline; font-family:'IBM Plex Mono',monospace; font-size:12px; padding:2px 0">
+                            <a href={x.href} target="_blank" rel="noopener" style="color:var(--c-text-sec); flex:1">{x.label}</a>
+                            <span style="color:var(--c-ink); white-space:nowrap">{x.v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div style="font-size:11.5px; color:var(--c-text-faint); display:flex; gap:16px; flex-wrap:wrap">
