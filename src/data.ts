@@ -4,6 +4,7 @@
 // falls back to the coefficient formulas in calc.ts and shows as "projected".
 
 import raw from '../data/app-data.json'
+import projected from '../data/app-data.projected.json'
 
 export type Vendor = 'nvidia' | 'amd' | 'apple' | 'intel' | 'cpu'
 export type Backend = 'cuda' | 'metal' | 'rocm' | 'vulkan' | 'cpu'
@@ -76,7 +77,15 @@ interface AppData {
   combos: Record<string, ComboPred>
 }
 
-const DATA = raw as unknown as AppData
+// Hand-curated entries (new models, cluster setups) live in app-data.projected.json so a
+// pipeline re-run can't overwrite them. Lists are appended; the pipeline wins on id clashes.
+const EXTRA = projected as unknown as Partial<AppData>
+const merge = <T extends { id: string }>(base: T[], extra: T[] = []) => [...base, ...extra.filter(e => !base.some(b => b.id === e.id))]
+const DATA: AppData = {
+  ...(raw as unknown as AppData),
+  hardware: merge((raw as unknown as AppData).hardware, EXTRA.hardware),
+  models: merge((raw as unknown as AppData).models, EXTRA.models),
+}
 
 export const HW: Hw[] = [...DATA.hardware].sort((a, b) => a.popularity_rank - b.popularity_rank)
 export const MODELS: Model[] = [...DATA.models].sort((a, b) => a.popularity_rank - b.popularity_rank)

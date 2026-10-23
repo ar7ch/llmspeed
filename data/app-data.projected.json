@@ -1,0 +1,377 @@
+{
+ "models": [
+  {
+   "id": "kimi-k2.6",
+   "name": "Kimi K2.6",
+   "family": "kimi",
+   "total_params_b": 1000,
+   "active_params_b": 32,
+   "kv_gb_per_8k": 0.576,
+   "quants": {
+    "ud-q4_k_xl": {
+     "file_gb": 583.71
+    },
+    "q3_k_m": {
+     "file_gb": 466.87
+    },
+    "q2_k": {
+     "file_gb": 358.19
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 340.48
+    },
+    "iq1_s": {
+     "file_gb": 207.4
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 16,
+   "pinned": false
+  },
+  {
+   "id": "kimi-k2.7-code",
+   "name": "Kimi K2.7 Code",
+   "family": "kimi",
+   "total_params_b": 1000,
+   "active_params_b": 32,
+   "kv_gb_per_8k": 0.576,
+   "quants": {
+    "ud-q4_k_xl": {
+     "file_gb": 583.71
+    },
+    "iq4_xs": {
+     "file_gb": 495.08
+    },
+    "q3_k_m": {
+     "file_gb": 463.62
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 339.46
+    },
+    "ud-iq1_m": {
+     "file_gb": 303.91
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 17,
+   "pinned": false
+  },
+  {
+   "id": "qwen3-coder-480b-a35b",
+   "name": "Qwen3 Coder 480B-A35B",
+   "family": "qwen",
+   "total_params_b": 480,
+   "active_params_b": 35,
+   "kv_gb_per_8k": 2.08,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 290.06
+    },
+    "q8_0": {
+     "file_gb": 510.35
+    },
+    "fp16": {
+     "file_gb": 960.44
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 275.55
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 180.29
+    },
+    "ud-iq1_m": {
+     "file_gb": 149.72
+    },
+    "iq4_xs": {
+     "file_gb": 260.54
+    },
+    "q3_k_m": {
+     "file_gb": 229.25
+    },
+    "q2_k": {
+     "file_gb": 174.66
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 18,
+   "pinned": false
+  },
+  {
+   "id": "qwen3-coder-30b-a3b",
+   "name": "Qwen3 Coder 30B-A3B",
+   "family": "qwen",
+   "total_params_b": 30.5,
+   "active_params_b": 3.3,
+   "kv_gb_per_8k": 0.805,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 18.56
+    },
+    "q8_0": {
+     "file_gb": 32.48
+    },
+    "fp16": {
+     "file_gb": 61.1
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 17.67
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 11.79
+    },
+    "ud-iq1_s": {
+     "file_gb": 8.91
+    },
+    "iq4_xs": {
+     "file_gb": 16.38
+    },
+    "q3_k_m": {
+     "file_gb": 14.71
+    },
+    "q2_k": {
+     "file_gb": 11.26
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 19,
+   "pinned": false
+  },
+  {
+   "id": "qwen3-coder-next",
+   "name": "Qwen3 Coder Next 80B-A3B",
+   "family": "qwen",
+   "total_params_b": 80,
+   "active_params_b": 3,
+   "kv_gb_per_8k": 0.201,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 48.53
+    },
+    "q8_0": {
+     "file_gb": 84.81
+    },
+    "fp16": {
+     "file_gb": 159.46
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 49.61
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 26.76
+    },
+    "ud-iq1_s": {
+     "file_gb": 21.51
+    },
+    "iq4_xs": {
+     "file_gb": 42.68
+    },
+    "q3_k_m": {
+     "file_gb": 38.32
+    },
+    "q2_k": {
+     "file_gb": 29.22
+    },
+    "mxfp4": {
+     "file_gb": 48.03
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 20,
+   "pinned": false
+  },
+  {
+   "id": "qwen3-235b-a22b-2507",
+   "name": "Qwen3 235B-A22B 2507",
+   "family": "qwen",
+   "total_params_b": 235,
+   "active_params_b": 22,
+   "kv_gb_per_8k": 1.577,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 142.15
+    },
+    "q8_0": {
+     "file_gb": 249.94
+    },
+    "fp16": {
+     "file_gb": 470.29
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 134.33
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 88.77
+    },
+    "iq4_xs": {
+     "file_gb": 125.48
+    },
+    "q3_k_m": {
+     "file_gb": 112.45
+    },
+    "q2_k": {
+     "file_gb": 85.69
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 21,
+   "pinned": false
+  },
+  {
+   "id": "mistral-small-3.2-24b",
+   "name": "Mistral Small 3.2 24B",
+   "family": "mistral",
+   "total_params_b": 24,
+   "active_params_b": 24,
+   "kv_gb_per_8k": 1.342,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 14.33
+    },
+    "q8_0": {
+     "file_gb": 25.05
+    },
+    "fp16": {
+     "file_gb": 47.15
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 14.55
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 9.29
+    },
+    "ud-iq1_s": {
+     "file_gb": 5.56
+    },
+    "iq4_xs": {
+     "file_gb": 12.78
+    },
+    "q3_k_m": {
+     "file_gb": 11.47
+    },
+    "q2_k": {
+     "file_gb": 8.89
+    }
+   },
+   "context_max": 131072,
+   "popularity_rank": 22,
+   "pinned": false
+  },
+  {
+   "id": "devstral-small-2-24b",
+   "name": "Devstral Small 2 24B",
+   "family": "mistral",
+   "total_params_b": 24,
+   "active_params_b": 24,
+   "kv_gb_per_8k": 1.342,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 14.33
+    },
+    "q8_0": {
+     "file_gb": 25.06
+    },
+    "fp16": {
+     "file_gb": 47.15
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 14.51
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 9.29
+    },
+    "ud-iq1_s": {
+     "file_gb": 5.56
+    },
+    "iq4_xs": {
+     "file_gb": 12.78
+    },
+    "q3_k_m": {
+     "file_gb": 11.47
+    },
+    "q2_k": {
+     "file_gb": 8.89
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 23,
+   "pinned": false
+  },
+  {
+   "id": "devstral-2-123b",
+   "name": "Devstral 2 123B",
+   "family": "mistral",
+   "total_params_b": 123,
+   "active_params_b": 123,
+   "kv_gb_per_8k": 2.953,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 74.9
+    },
+    "q8_0": {
+     "file_gb": 132.85
+    },
+    "fp16": {
+     "file_gb": 250.06
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 75.5
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 47.94
+    },
+    "ud-iq1_s": {
+     "file_gb": 28.45
+    },
+    "iq4_xs": {
+     "file_gb": 67.12
+    },
+    "q3_k_m": {
+     "file_gb": 60.62
+    },
+    "q2_k": {
+     "file_gb": 46.59
+    }
+   },
+   "context_max": 262144,
+   "popularity_rank": 24,
+   "pinned": false
+  },
+  {
+   "id": "magistral-small-2509",
+   "name": "Magistral Small 2509",
+   "family": "mistral",
+   "total_params_b": 24,
+   "active_params_b": 24,
+   "kv_gb_per_8k": 1.342,
+   "quants": {
+    "q4_k_m": {
+     "file_gb": 14.33
+    },
+    "q8_0": {
+     "file_gb": 25.05
+    },
+    "fp16": {
+     "file_gb": 47.15
+    },
+    "ud-q4_k_xl": {
+     "file_gb": 14.51
+    },
+    "ud-q2_k_xl": {
+     "file_gb": 9.29
+    },
+    "iq4_xs": {
+     "file_gb": 12.78
+    },
+    "q3_k_m": {
+     "file_gb": 11.47
+    },
+    "q2_k": {
+     "file_gb": 8.89
+    }
+   },
+   "context_max": 131072,
+   "popularity_rank": 25,
+   "pinned": false
+  }
+ ]
+}

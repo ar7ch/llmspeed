@@ -4,6 +4,7 @@ dist/
 !.claude/settings.json
 data/*
 !data/app-data.json
+!data/app-data.projected.json
 docs/
 scripts/
 .DS_Store
