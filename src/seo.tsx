@@ -128,7 +128,7 @@ const params = (m: Model) => (m.active_params_b < m.total_params_b
   : `a ${m.total_params_b}B-parameter model`) + released(m)
 const CONF_TEXT: Record<string, string> = {
   measured: 'This estimate is based on community benchmarks of this exact setup.',
-  derived: 'This estimate is interpolated from benchmarks of similar setups.',
+  derived: 'This setup was not benchmarked; the estimate comes from a formula calibrated on measured runs of similar setups.',
   projected: 'This estimate is projected from the hardware specs; no benchmarks exist yet.',
 }
 

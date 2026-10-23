@@ -526,19 +526,38 @@
   }
  },
  "projected_decode_eff": {
-  "note": "Median of gen_tps \u00d7 active weight GB \u00f7 bandwidth over measured single-device combos in app-data.json (2026-10-17), split by dense/MoE. Backends with fewer than 5 measured rows per class fall back to the pipeline coefficient.",
+  "note": "Median of gen_tps x active weight GB / bandwidth over llama.cpp single-device decode rows at short context, split by dense/MoE: measured combos in app-data.json and this overlay (MLX rows and pipeline_demote left out), plus published llama-bench runs of other dense GGUF models (2026-10-24). Spec decoding and MTP off. Pipeline-derived combos on these backends are recentred on these values. hardware lists dense overrides for devices with at least 3 such rows whose median differs from the backend value by more than 20%. MoE models read at least moe_min_gb_per_b GB per billion active parameters (the attention and shared weights stay near 8 bits in low-bit files) and add moe_overhead_ms per token for routing and kernel launches; the moe values are fitted with both terms. Leave-one-source-out median error: CUDA dense 6%, Metal dense 13%, ROCm dense 10%, MoE 25% (was 32% without the two terms).",
   "cuda": {
-   "dense": 0.521,
-   "moe": 0.363
+   "dense": 0.748,
+   "moe": 0.472
   },
   "metal": {
-   "dense": 0.59,
-   "moe": 0.32
+   "dense": 0.742,
+   "moe": 0.431
   },
   "rocm": {
-   "dense": 0.685,
-   "moe": 0.442
-  }
+   "dense": 0.752,
+   "moe": 0.6
+  },
+  "hardware": {
+   "mac-studio-m3-ultra-512gb": 0.569,
+   "instinct-mi50-32gb": 0.395,
+   "rx-9070-xt": 0.601
+  },
+  "sources": [
+   "https://github.com/ggml-org/llama.cpp/discussions/15013",
+   "https://github.com/ggml-org/llama.cpp/discussions/15021",
+   "https://github.com/ggml-org/llama.cpp/discussions/4167",
+   "https://github.com/geerlingguy/ai-benchmarks/issues/42",
+   "https://github.com/kyuz0/amd-strix-halo-toolboxes",
+   "https://llm-tracker.info/RTX-PRO-6000",
+   "https://uepon.hatenadiary.com/entry/2026/08/29/001732",
+   "http://wtarreau.blogspot.com/2025/12/amd-radeon-instinct-mi50-32gb-best-ai.html",
+   "https://computingforgeeks.com/build-dual-rtx-3090-llm/",
+   "https://www.reddit.com/r/LocalLLaMA/comments/1s0czc4/"
+  ],
+  "moe_min_gb_per_b": 0.5,
+  "moe_overhead_ms": 2.0
  },
  "combos": {
   "dgx-spark-128gb|qwen3-coder-30b-a3b|q8_0": {
@@ -1411,6 +1430,391 @@
    "sources": [
     "https://arxiv.org/abs/2607.19438"
    ]
+  },
+  "rtx-3090|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    36.13,
+    44.15
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://ahelpme.com/ai/llamacpp-ai/llama-bench-the-qwen3-6-27b-and-nvidia-rtx-3090/"
+   ]
+  },
+  "rtx-4090|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    43.11,
+    52.69
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://computingforgeeks.com/run-qwen3-8-27b-locally/"
+   ],
+   "ran": "UD-Q4_K_XL",
+   "tested": [
+    "Qwen 3.8 27B"
+   ]
+  },
+  "rtx-5090|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    69.38,
+    84.8
+   ],
+   "prefill_tps": [
+    [
+     3443.2,
+     4208.4
+    ],
+    [
+     3443.2,
+     4208.4
+    ],
+    [
+     3443.2,
+     4208.4
+    ],
+    [
+     2754.6,
+     3366.7
+    ]
+   ],
+   "sources": [
+    "https://huggingface.co/datasets/witcheer/rtx-5090-benchmarks"
+   ]
+  },
+  "rtx-pro-6000-blackwell|qwen3.6-27b|q8_0": {
+   "tier": "measured",
+   "gen_tps": [
+    41.18,
+    50.34
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://jarvislabs.ai/blog/qwen36-mtp-llamacpp-rtxpro6000"
+   ]
+  },
+  "dgx-spark-128gb|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    10.66,
+    13.04
+   ],
+   "prefill_tps": [
+    [
+     741.1,
+     905.8
+    ],
+    [
+     741.1,
+     905.8
+    ],
+    [
+     741.1,
+     905.8
+    ],
+    [
+     592.9,
+     724.7
+    ]
+   ],
+   "sources": [
+    "https://github.com/nabe2030/dense-27b-31b-dgx-spark"
+   ]
+  },
+  "dgx-spark-128gb|qwen3.6-27b|fp16": {
+   "tier": "measured",
+   "gen_tps": [
+    4.09,
+    4.99
+   ],
+   "prefill_tps": [
+    [
+     814.3,
+     995.3
+    ],
+    [
+     814.3,
+     995.3
+    ],
+    [
+     814.3,
+     995.3
+    ],
+    [
+     651.5,
+     796.2
+    ]
+   ],
+   "sources": [
+    "https://github.com/nabe2030/dense-27b-31b-dgx-spark"
+   ],
+   "ran": "BF16"
+  },
+  "dgx-spark-128gb|gemma-4-31b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    9.59,
+    11.72
+   ],
+   "prefill_tps": [
+    [
+     671.7,
+     820.9
+    ],
+    [
+     671.7,
+     820.9
+    ],
+    [
+     671.7,
+     820.9
+    ],
+    [
+     537.3,
+     656.8
+    ]
+   ],
+   "sources": [
+    "https://github.com/nabe2030/dense-27b-31b-dgx-spark"
+   ]
+  },
+  "dgx-spark-128gb|gemma-4-31b|fp16": {
+   "tier": "measured",
+   "gen_tps": [
+    3.44,
+    4.2
+   ],
+   "prefill_tps": [
+    [
+     750.5,
+     917.3
+    ],
+    [
+     750.5,
+     917.3
+    ],
+    [
+     750.5,
+     917.3
+    ],
+    [
+     600.4,
+     733.8
+    ]
+   ],
+   "sources": [
+    "https://github.com/nabe2030/dense-27b-31b-dgx-spark"
+   ],
+   "ran": "BF16"
+  },
+  "rtx-3090|gemma-4-31b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    33.21,
+    40.59
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://github.com/PMZFX/intel-arc-pro-b70-benchmarks/blob/master/cross-card-comparison.md"
+   ]
+  },
+  "rtx-5090|gemma-4-31b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    61.65,
+    75.35
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://atomic.chat/blog/guides/best-local-llms-for-rtx-5090"
+   ]
+  },
+  "rtx-3090|qwen3.5-9b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    102.33,
+    125.07
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://github.com/PMZFX/intel-arc-pro-b70-benchmarks/blob/master/cross-card-comparison.md"
+   ]
+  },
+  "rtx-3060|qwen3.5-9b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    45.72,
+    55.88
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://github.com/PMZFX/intel-arc-pro-b70-benchmarks/blob/master/cross-card-comparison.md"
+   ]
+  },
+  "rtx-3060|qwen3.5-9b|q8_0": {
+   "tier": "measured",
+   "gen_tps": [
+    30.96,
+    37.84
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://github.com/PMZFX/intel-arc-pro-b70-benchmarks/blob/master/cross-card-comparison.md"
+   ]
+  },
+  "rtx-5080|qwen3.5-9b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    119.65,
+    146.25
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://arxiv.org/html/2609.14864"
+   ]
+  },
+  "rtx-5080|qwen3.5-9b|q8_0": {
+   "tier": "measured",
+   "gen_tps": [
+    80.08,
+    97.88
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://arxiv.org/html/2609.14864"
+   ]
+  },
+  "rtx-pro-6000-blackwell|llama-3.1-8b|q8_0": {
+   "tier": "measured",
+   "gen_tps": [
+    148.59,
+    181.61
+   ],
+   "prefill_tps": [
+    [
+     12636.0,
+     15444.0
+    ],
+    [
+     12636.0,
+     15444.0
+    ],
+    [
+     12636.0,
+     15444.0
+    ],
+    [
+     10108.8,
+     12355.2
+    ]
+   ],
+   "sources": [
+    "https://forum.level1techs.com/t/rtx-pro-6000-600w-vs-300w-performance/242017"
+   ],
+   "tested": [
+    "Llama 3.1 8B UltraLong 1M"
+   ]
+  },
+  "rtx-5090|llama-3.1-8b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    206.01,
+    251.79
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://bmdpat.com/receipts/rtx-5090/llama-3-1-8b.md"
+   ]
+  },
+  "m5-max-128gb|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    21.87,
+    26.73
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://www.reddit.com/r/LocalLLaMA/comments/1s0czc4/"
+   ],
+   "tested": [
+    "Qwen3.5 27B"
+   ]
+  },
+  "mac-studio-m3-ultra-512gb|qwen3.5-9b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    70.02,
+    85.58
+   ],
+   "prefill_tps": [
+    [
+     909.0,
+     1111.0
+    ],
+    [
+     909.0,
+     1111.0
+    ],
+    [
+     909.0,
+     1111.0
+    ],
+    [
+     727.2,
+     888.8
+    ]
+   ],
+   "sources": [
+    "https://terminalbytes.com/ollama-vs-llama-cpp-vs-mlx-mac-2026/"
+   ]
+  },
+  "mac-mini-m5-pro-64gb|qwen3.6-27b|q8_0": {
+   "tier": "measured",
+   "gen_tps": [
+    9.11,
+    11.13
+   ],
+   "prefill_tps": [
+    [
+     373.3,
+     456.3
+    ],
+    [
+     373.3,
+     456.3
+    ],
+    [
+     373.3,
+     456.3
+    ],
+    [
+     298.7,
+     365.0
+    ]
+   ],
+   "sources": [
+    "https://github.com/eltoncarr/mac-mini-benchmarks/blob/main/RESULTS.md"
+   ],
+   "tested": [
+    "Qwen 3.8 27B"
+   ]
+  },
+  "m4-pro-24gb|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    10.26,
+    12.54
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://halfpennymac.com/qwen38-27b-m4-mac-mini-benchmark"
+   ],
+   "tested": [
+    "Qwen 3.8 27B"
+   ]
   }
  },
  "cluster_runs": [
@@ -2046,6 +2450,46 @@
   "sources": [
    "https://arxiv.org/abs/2607.19438",
    "https://github.com/ggml-org/llama.cpp/discussions/4167"
+  ]
+ },
+ "mlx_to_llamacpp": {
+  "note": "Overlay rows measured with MLX (ran mentions MLX) are scaled to llama.cpp at load: gen_tps x decode, prefill_tps x prefill. Median over 22 same-Mac pairs of MLX 4/8-bit against llama.cpp Q4/Q8 GGUF (11 dense, 11 MoE): MLX decodes 1.19x faster (range 0.90-1.61; Qwen3.5/3.6/3.8 models 1.2-1.6x, Gemma, Llama, Qwen3 and gpt-oss 0.9-1.2x) and processes short prompts at 0.82x (16 pairs, range 0.45-1.13).",
+  "decode": 0.84,
+  "prefill": 1.23,
+  "sources": [
+   "https://arxiv.org/html/2607.19438",
+   "https://arxiv.org/html/2607.00501",
+   "https://arxiv.org/html/2601.19139",
+   "https://www.reddit.com/r/LocalLLaMA/comments/1s0czc4/",
+   "https://github.com/stared/benching-local-llms-on-apple-silicon",
+   "https://halfpennymac.com/omlx-vs-llamacpp-qwen38-27b-mac-benchmark",
+   "https://bishal.io/blog/six-local-models-m1-max-llama-cpp-vs-mlx/",
+   "https://terminalbytes.com/ollama-vs-llama-cpp-vs-mlx-mac-2026/",
+   "https://rapidmlx.com/blog/mlx-vs-llama-cpp-benchmark"
+  ]
+ },
+ "pipeline_demote": {
+  "note": "Pipeline measured combos treated as derived: decode is recentred on projected_decode_eff and the pipeline prefill is kept. The Llama 3.1 8B Q4_K_M rows match LocalScore (localscore.ai/model/1), whose generation figure runs 0.2-0.6x llama-bench tg128 on the same cards (RTX 5090 66 tok/s against 300 for Llama 2 7B Q4_0 in the CUDA scoreboard; RX 7900 XTX 45 against 167). The H100 row stays: its 122 tok/s is nearer the scoreboard (281 for Llama 2 7B Q4_0, about 220 scaled to this file) than the formula (about 500).",
+  "sources": [
+   "https://www.localscore.ai/model/1",
+   "https://github.com/ggml-org/llama.cpp/discussions/15013"
+  ],
+  "keys": [
+   "dgx-spark-128gb|llama-3.1-8b|q4_k_m",
+   "instinct-mi50-32gb|llama-3.1-8b|q4_k_m",
+   "m4-max-128gb|llama-3.1-8b|q4_k_m",
+   "m4-pro-24gb|llama-3.1-8b|q4_k_m",
+   "mac-mini-m5-pro-64gb|llama-3.1-8b|q4_k_m",
+   "mac-studio-m3-ultra-512gb|llama-3.1-8b|q4_k_m",
+   "rtx-3090|llama-3.1-8b|q4_k_m",
+   "rtx-4090|llama-3.1-8b|q4_k_m",
+   "rtx-5060-ti-16gb|llama-3.1-8b|q4_k_m",
+   "rtx-5070-ti|llama-3.1-8b|q4_k_m",
+   "rtx-5080|llama-3.1-8b|q4_k_m",
+   "rtx-5090|llama-3.1-8b|q4_k_m",
+   "rtx-pro-6000-blackwell|llama-3.1-8b|q4_k_m",
+   "rx-7900-xtx|llama-3.1-8b|q4_k_m",
+   "tesla-v100-32gb|llama-3.1-8b|q4_k_m"
   ]
  }
 }

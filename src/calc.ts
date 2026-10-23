@@ -1,4 +1,4 @@
-import { coeffs, combo, macUsable, decodeEff, handPrefill, linkFor, LONG_CTX, OFFLOAD, prefillMult, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
+import { coeffs, combo, decodeCost, macUsable, decodeEff, decodeEffCalibrated, handPrefill, linkFor, LONG_CTX, OFFLOAD, prefillMult, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
 
 export type Fit = 'fits' | 'partial' | 'no'
 export type Conf = 'measured' | 'derived' | 'projected' | null
@@ -33,6 +33,8 @@ export interface CalcResult {
   eff: number
   /** active weight bytes read per token, GB */
   aw: number
+  /** fixed time per token in the bandwidth formula, ms (MoE only) */
+  tokMs: number
   /** the range came from a pipeline per-combo prediction, not the coefficient formula */
   fromCombo: boolean
   /** fraction of model weights resident on GPU (1 unless fit is partial) */
@@ -107,16 +109,23 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, opts: Opts 
   const derate = shortDerate * longCtx(ctx, decodeK)
   const aw = w * (m.active_params_b / m.total_params_b)
   const cb = combo(hw.id, m.id, q.id)
-  const eff = decodeEff(hw.backend, moe)
+  const eff = decodeEff(hw, moe)
+  const cost = decodeCost(hw, m, aw)
+  const formula = 1 / (cost.gb / (hw.bandwidth_gbs * eff) + cost.ms / 1000)
 
   let lo: number, hi: number, conf: Conf, fromCombo = false
   if (cb && cb.gen_tps && cb.tier !== 'wont_run') {
-    lo = cb.gen_tps[0] * derate
-    hi = cb.gen_tps[1] * derate
+    // Derived combos are the pipeline's blended per-backend coefficient, which sits 35% under measured
+    // dense CUDA rows and 20-50% over MoE rows. They are recentred on the calibrated efficiency and
+    // keep their relative spread.
+    const s = cb.tier === 'derived' && decodeEffCalibrated(hw.backend)
+      ? 2 * formula / (cb.gen_tps[0] + cb.gen_tps[1]) : 1
+    lo = cb.gen_tps[0] * s * derate
+    hi = cb.gen_tps[1] * s * derate
     conf = cb.tier
     fromCombo = true
   } else {
-    const b = (hw.bandwidth_gbs * eff / aw) * derate
+    const b = formula * derate
     lo = b * 0.85
     hi = b * 1.15
     conf = 'projected'
@@ -129,6 +138,9 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, opts: Opts 
   let gpuShare = 1
   if (fit === 'partial') {
     gpuShare = usable / total
+    // TODO: the GPU term keeps the pipeline's blended coefficient because OFFLOAD.ram_bw_gbs was fitted
+    // together with it; refit both with the dense/MoE split once measured offload runs exist. Until then
+    // the GPU term steps up where a model stops fitting, though the RAM term dominates there.
     const t = (gpuShare * aw) / (hw.bandwidth_gbs * co.decode_bw_eff) + ((1 - gpuShare) * aw) / OFFLOAD.ram_bw_gbs
     const mid = derate / t
     lo = mid / OFFLOAD.err_q80
@@ -164,7 +176,7 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, opts: Opts 
   const ttft = ctx / pre + (fit === 'partial' ? 1.2 : 0.3)
 
   if (fit === 'no') conf = null
-  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: fit === 'partial' ? co.decode_bw_eff : eff, aw, fromCombo, gpuShare, n, decF, preF, opts }
+  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: fit === 'partial' ? co.decode_bw_eff : eff, aw: fit === 'partial' ? aw : cost.gb, tokMs: fit === 'partial' ? 0 : cost.ms, fromCombo, gpuShare, n, decF, preF, opts }
 }
 
 export function fmt(x: number): string {

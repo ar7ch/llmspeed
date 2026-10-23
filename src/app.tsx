@@ -1,5 +1,5 @@
 import { Component, type ComponentChild } from 'preact'
-import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, macCanRaise, macUsable, BENCHES, scoresOf, isVendorScore, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
+import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, macCanRaise, macUsable, BENCHES, scoresOf, isVendorScore, clusterRuns, combo, decodeEffCalibrated, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ, type Opts } from './calc'
 import { track } from './analytics'
 import { BASE, pageFromPath, pageMeta, pageCfg, SeoSection, settingsQuery, SITE } from './seo'
@@ -637,11 +637,13 @@ export class App extends Component<{}, St> {
         { n: '3', f: `Fit: ${c.total.toFixed(1)} GB needed vs ${c.usable.toFixed(1)} GB usable`, v: c.fit === 'fits' ? 'fits' : 'partial offload' },
         { n: '4', f: c.fit === 'partial'
           ? `Decode: hybrid offload — ${Math.round(c.gpuShare * 100)}% of active weights read at GPU speed (${hw.bandwidth_gbs} GB/s × ${c.eff}), ${Math.round((1 - c.gpuShare) * 100)}% at system-RAM speed (~${OFFLOAD.ram_bw_gbs} GB/s)`
-          : c.fromCombo
+          : c.fromCombo && !(combo(hw.id, m.id, q.id)?.tier === 'derived' && decodeEffCalibrated(hw.backend))
           ? `Decode: ${c.n > 1 ? 'single-device ' : ''}benchmark range for this combo × context derating`
-          : `Decode ≈ bandwidth × efficiency ÷ active weights: ${hw.bandwidth_gbs} GB/s × ${c.eff} ÷ ${c.aw.toFixed(1)} GB`, v: `${fmt(c.base)} tok/s` },
+          : c.tokMs
+          ? `Decode ≈ ${c.n > 1 ? 'single-device ' : ''}1 ÷ (active weights ÷ (bandwidth × efficiency) + MoE time per token) × context derating: 1 ÷ (${c.aw.toFixed(1)} GB ÷ (${hw.bandwidth_gbs} GB/s × ${c.eff}) + ${c.tokMs} ms)`
+          : `Decode ≈ ${c.n > 1 ? 'single-device ' : ''}bandwidth × efficiency ÷ active weights × context derating: ${hw.bandwidth_gbs} GB/s × ${c.eff} ÷ ${c.aw.toFixed(1)} GB`, v: `${fmt(c.base)} tok/s` },
         ...(c.n > 1 ? [{ n: '4b', f: `Cluster: ${c.n}× over ${linkFor(hw).label}, ${linkFor(hw).mode === 'tensor' ? 'tensor parallel' : 'layer split'}${m.active_params_b < m.total_params_b ? ' (MoE scales less)' : ''}. Decode ×${c.decF.toFixed(2)}, prefill ×${c.preF.toFixed(2)} vs one device`, v: 'projected' }] : []),
-        { n: '5', f: c.fit === 'partial' ? 'Spread: calibrated from measured offload runs (RAM speeds vary)' : c.fromCombo && c.n > 1 ? 'Spread: single-device interval × cluster scaling (projected)' : c.fromCombo && combo(hw.id, m.id, q.id)?.sources ? 'Spread: range across the linked measurements (±10% for a single one)' : c.fromCombo ? 'Spread: holdout-validated interval' : 'Spread ±15% (engine, thermals, runtime)', v: `${fmt(c.lo)}–${fmt(c.hi)} tok/s` },
+        { n: '5', f: c.fit === 'partial' ? 'Spread: calibrated from measured offload runs (RAM speeds vary)' : c.fromCombo && c.n > 1 ? 'Spread: single-device interval × cluster scaling (projected)' : c.fromCombo && combo(hw.id, m.id, q.id)?.sources ? 'Spread: range across the linked measurements (±10% for a single one)' : c.fromCombo && combo(hw.id, m.id, q.id)?.tier === 'derived' && decodeEffCalibrated(hw.backend) ? 'Spread: the pipeline\'s holdout interval width, centred on the formula' : c.fromCombo ? 'Spread: holdout-validated interval' : 'Spread ±15% (engine, thermals, runtime)', v: `${fmt(c.lo)}–${fmt(c.hi)} tok/s` },
         { n: '6', f: `Prefill ≈ ${Math.round(c.pre).toLocaleString()} tok/s → ${ctx.toLocaleString()} ÷ that + overhead`, v: `TTFT ${c.ttft < 10 ? c.ttft.toFixed(1) : Math.round(c.ttft)} s` },
       ]
     }
@@ -776,7 +778,7 @@ export class App extends Component<{}, St> {
       applySugg: () => suggQ && this.setState(x => ({ cfgs: x.cfgs.map((cc, j) => j === 0 ? { ...cc, quant: suggQ! } : cc) })),
       tokHelp: 'Tokens generated per second. People read about 5 tok/s; 10–20 feels comfortable for chat, coding agents want 20+.',
       ttftHelp: 'Time to first token: how long the model reads your prompt before it starts answering. Grows with prompt length.',
-      confHelp: 'How solid this prediction is. Measured = benchmarked on this exact setup. Derived = interpolated from similar setups. Projected = calculated from hardware specs alone.',
+      confHelp: 'How solid this prediction is. Measured = benchmarked on this exact setup. Derived = calibrated on measured runs of similar setups. Projected = calculated from hardware specs alone.',
       tipTok: s.tip === 'tok', tipTtft: s.tip === 'ttft', tipConf: s.tip === 'conf',
       tipTokOn: () => this.setState({ tip: 'tok' }),
       tipTtftOn: () => this.setState({ tip: 'ttft' }),
@@ -1231,7 +1233,7 @@ export class App extends Component<{}, St> {
                       <div style="margin-top:10px; font-size:12px; color:var(--c-text-muted)">
                         Measured: {sec.sources.map((u, j) => <a key={j} href={u} target="_blank" rel="noopener" style="color:var(--c-text-sec); margin-right:8px">[{j + 1}]</a>)}
                         {sec.tested && <span> · some runs used {sec.tested} (same architecture and size)</span>}
-                        {sec.ran && <span> · measured with {sec.ran}, not this exact file</span>}
+                        {sec.ran && <span> · measured with {sec.ran}, not this exact file{sec.ran.includes('MLX') ? ', scaled to llama.cpp speed' : ''}</span>}
                       </div>
                     )}
                     {sec.macNote && <div style="margin-top:10px; font-size:12px; line-height:1.5; color:var(--c-text-muted)">{sec.macNote}</div>}

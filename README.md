@@ -30,7 +30,7 @@ Every estimate is labeled with how much to trust it:
 | Label | Meaning |
 |---|---|
 | **Measured** | Benchmarked on this exact hardware, model and quantization |
-| **Derived** | Interpolated from measured benchmarks of similar setups |
+| **Derived** | Not measured on this setup: on NVIDIA, Apple and AMD GPUs the bandwidth formula calibrated on measured llama.cpp runs, elsewhere interpolated from similar setups |
 | **Projected** | Calculated from hardware specs, e.g. for announced but unreleased hardware |
 
 **Sources.** Benchmarks are collected and verified from [r/LocalLLaMA](https://www.reddit.com/r/LocalLLaMA/), [localscore.ai](https://www.localscore.ai/), llama.cpp discussions and more.
@@ -39,7 +39,8 @@ Every estimate is labeled with how much to trust it:
 
 - **Generation speed** is bound by memory bandwidth: every token reads the active weights once. For mixture-of-experts models only the active parameters count.
 - **Prompt processing** is bound by compute (FP16 TFLOPS). M5 Macs get a per-chip multiplier for the matrix units in their GPU cores, which the TFLOPS figure leaves out.
-- Both use per-backend efficiency coefficients calibrated against the measured benchmarks, plus a slowdown as context grows.
+- Both use per-backend efficiency coefficients calibrated against the measured benchmarks, plus a slowdown as context grows. Decode efficiency is fitted separately for dense and mixture-of-experts models to llama.cpp runs at short context with speculative decoding off, and a few devices whose own runs sit far from their backend (M3 Ultra, MI50, RX 9070 XT) get their own dense value. For mixture-of-experts models the formula also adds a fixed 2 ms per token and counts at least 0.5 GB per billion active parameters, since attention and shared weights stay near 8 bits in low-bit files; without these, tiny active weights projected several hundred tokens per second more than measured runs show. The fitted values and their sources are in [`data/app-data.projected.json`](data/app-data.projected.json) under `projected_decode_eff`.
+- **The engine is llama.cpp** (also what Ollama and LM Studio run for GGUF files). A few measured rows only exist as MLX runs on a Mac; they are scaled to llama.cpp speed (decode ×0.84, prompt processing ×1.23, medians of same-Mac pairs), and the breakdown names the MLX file they ran.
 - **Partial offload** uses a hybrid model: the GPU-resident share streams at GPU bandwidth and the spilled share at an effective system-RAM bandwidth, calibrated from measured offload runs.
 - **Memory fit** counts weights, KV cache and runtime overhead against usable memory: about 75% of unified memory on Macs and 93% of VRAM on discrete GPUs. The KV cache defaults to F16, which llama.cpp, Ollama and LM Studio all use unless told otherwise; Q8_0 and Q4_0 caches can be picked in the quantization menu. The cache type changes memory only, not the speed estimate.
 
@@ -85,6 +86,7 @@ Built with [Vite](https://vite.dev), [Preact](https://preactjs.com) and TypeScri
 - **Clusters are projected.** Multi-device speeds scale a single-device estimate by per-link factors calibrated from a handful of published runs; most of those runs used engine-native formats (MLX, NVFP4, AWQ), not GGUF.
 - **Mac memory** assumes the default macOS GPU limit (about 75% of unified memory). The hardware menu can switch to a raised limit (total minus 8 GB, set with `sudo sysctl iogpu.wired_limit_mb`), which resets on reboot.
 - **M5 prompt processing** assumes an engine that uses the Metal 4 tensor API, as current llama.cpp does. Builds without it, such as some LM Studio runtimes, can process prompts about half as fast.
+- **Partial offload** still uses the older blended GPU efficiency, because its system-RAM bandwidth was fitted together with it. Speeds just past the fit boundary can therefore step down more than they would in practice.
 - **Estimates, not guarantees.** Drivers, engine versions, flash attention, power limits and thermals can all move real numbers by 10–30%.
 - **Projected numbers** for unreleased hardware will be replaced with measurements as they appear.
 

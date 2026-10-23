@@ -145,7 +145,18 @@ interface AppData {
   long_context?: LongCtx
   /** first open-weights release, YYYY-MM-DD */
   released?: Record<string, string>
-  projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>>
+  /** decode bandwidth efficiency per backend, plus dense overrides per hardware id */
+  projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>> & {
+    hardware?: Record<string, number>
+    /** MoE floor on weight bytes read per token, GB per billion active params */
+    moe_min_gb_per_b?: number
+    /** MoE fixed time per token, ms */
+    moe_overhead_ms?: number
+  }
+  /** factors that put a row measured with MLX on the llama.cpp basis the app models */
+  mlx_to_llamacpp?: { decode: number; prefill: number }
+  /** pipeline measured combos treated as derived because the source measured something else */
+  pipeline_demote?: { keys: string[] }
   /** per-hardware prefill multipliers for chips whose compute the TFLOPS spec understates */
   prefill_mult?: { hardware: Record<string, { dense: number; moe: number }> }
 }
@@ -153,15 +164,25 @@ interface AppData {
 // Hand-curated entries (new models, cluster setups) live in app-data.projected.json so a
 // pipeline re-run can't overwrite them. Lists are appended; the pipeline wins on id clashes,
 // except that a measured overlay combo replaces a pipeline combo that is only derived or projected
-// (keeping the pipeline's prefill when the overlay has none).
+// (keeping the pipeline's prefill when the overlay has none). Overlay rows measured with MLX are scaled
+// to llama.cpp speed, and pipeline combos listed in pipeline_demote count as derived.
 const EXTRA = projected as unknown as Partial<AppData>
-const RAW_COMBOS = (raw as unknown as AppData).combos
+const MLX = EXTRA.mlx_to_llamacpp
+const EXTRA_COMBOS: Record<string, ComboPred> = Object.fromEntries(Object.entries(EXTRA.combos ?? {}).map(([k, c]) =>
+  [k, MLX && c.ran?.includes('MLX') ? {
+    ...c,
+    gen_tps: c.gen_tps && [c.gen_tps[0] * MLX.decode, c.gen_tps[1] * MLX.decode],
+    prefill_tps: c.prefill_tps && c.prefill_tps.map(([a, b]) => [a * MLX.prefill, b * MLX.prefill]),
+  } : c]))
+const DEMOTE = new Set(EXTRA.pipeline_demote?.keys ?? [])
+const RAW_COMBOS: Record<string, ComboPred> = Object.fromEntries(Object.entries((raw as unknown as AppData).combos)
+  .map(([k, c]) => [k, DEMOTE.has(k) ? { ...c, tier: 'derived' as const } : c]))
 const merge = <T extends { id: string }>(base: T[], extra: T[] = []) => [...base, ...extra.filter(e => !base.some(b => b.id === e.id))]
 const DATA: AppData = {
   ...(raw as unknown as AppData),
   hardware: merge((raw as unknown as AppData).hardware, EXTRA.hardware),
   models: merge((raw as unknown as AppData).models, EXTRA.models),
-  combos: { ...EXTRA.combos, ...RAW_COMBOS, ...Object.fromEntries(Object.entries(EXTRA.combos ?? {})
+  combos: { ...EXTRA_COMBOS, ...RAW_COMBOS, ...Object.fromEntries(Object.entries(EXTRA_COMBOS)
     .filter(([k, c]) => c.tier === 'measured' && RAW_COMBOS[k] && RAW_COMBOS[k].tier !== 'measured')
     .map(([k, c]) => [k, c.prefill_tps ? c : { ...c, prefill_tps: RAW_COMBOS[k].prefill_tps }])) },
   links: EXTRA.links,
@@ -198,11 +219,24 @@ export function coeffs(backend: Backend): Coeffs {
   return DATA.coefficients[backend] ?? FALLBACK_COEFFS
 }
 
-/** decode bandwidth efficiency for the spec-formula path: measured-only and split by dense/MoE
- *  where there's enough data, since the pipeline's blended coefficient underrates dense models */
-export function decodeEff(backend: Backend, moe: boolean): number {
-  const e = DATA.projected_decode_eff?.[backend]
-  return e ? (moe ? e.moe : e.dense) : coeffs(backend).decode_bw_eff
+/** decode bandwidth efficiency from measured llama.cpp rows, split by dense/MoE, with per-device dense
+ *  overrides; backends the overlay doesn't calibrate fall back to the pipeline's blended coefficient */
+export function decodeEff(hw: Hw, moe: boolean): number {
+  const h = moe ? undefined : DATA.projected_decode_eff?.hardware?.[hw.id]
+  const e = DATA.projected_decode_eff?.[hw.backend]
+  return h ?? (e ? (moe ? e.moe : e.dense) : coeffs(hw.backend).decode_bw_eff)
+}
+
+/** the overlay calibrates decode efficiency for this backend */
+export const decodeEffCalibrated = (backend: Backend) => !!DATA.projected_decode_eff?.[backend]
+
+/** weight GB read per token and fixed ms per token for the bandwidth formula. On calibrated backends
+ *  MoE models read at least a floor per active parameter and pay a fixed per-token time, so tiny
+ *  active weights don't project absurd speeds. */
+export function decodeCost(hw: Hw, m: Model, aw: number): { gb: number; ms: number } {
+  const e = DATA.projected_decode_eff
+  if (m.active_params_b >= m.total_params_b || !decodeEffCalibrated(hw.backend)) return { gb: aw, ms: 0 }
+  return { gb: Math.max(aw, m.active_params_b * (e?.moe_min_gb_per_b ?? 0)), ms: e?.moe_overhead_ms ?? 0 }
 }
 
 /** prefill multiplier for this hardware, 1 unless the overlay calibrates one */
@@ -269,7 +303,7 @@ export function combo(hwId: string, modelId: string, quantId: string): ComboPred
 /** the combo in effect is a hand-curated one with its own measured prefill */
 export function handPrefill(hwId: string, modelId: string, quantId: string): boolean {
   const k = `${hwId}|${modelId}|${quantId}`
-  return !!DATA.combos[k]?.prefill_tps && DATA.combos[k] === EXTRA.combos?.[k]
+  return !!DATA.combos[k]?.prefill_tps && DATA.combos[k] === EXTRA_COMBOS[k]
 }
 
 // Share URLs minted before the pipeline-style catalog ids existed. Catalog ids are
