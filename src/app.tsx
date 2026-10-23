@@ -494,6 +494,7 @@ export class App extends Component<{}, St> {
       return { text: '', tip: `${top ? 'Top third' : 'Lower ranked'} for this setup · ${at}`, style: `width:8px; height:8px; border-radius:50%; background:${top ? 'oklch(0.55 0.15 155)' : 'oklch(0.68 0.13 75)'}` }
     }
     // Best sort: models that meet the floor by adjusted score, then the too-slow ones, then the rest
+    const ctxLabel = (t: number) => t >= 1048576 ? `${+(t / 1048576).toFixed(1)}M ctx` : `${Math.round(t / 1024)}K ctx`
     const rankKey = (mm: Model) => { const x = rankedOf(mm); return x ? (x.ok ? 2e6 : 1e6) + x.adj : 0 }
     // the dropdown's estimate for a model, at rowQuant
     const mcalc = (mm: Model) => rankedOf(mm)?.c ?? calc(hw, mm, quantOf(rowQuant(mm)), ctx, n)
@@ -543,7 +544,7 @@ export class App extends Component<{}, St> {
         mm => mcalc(mm).fit,
         mm => ({ name: mm.name, meta: [s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
           : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
-          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, releasedLabel(mm.id)].filter(Boolean).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
+          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, ctxLabel(mm.context_max), releasedLabel(mm.id)].filter(Boolean).map(x => x.replace(/ /g, '\u00a0')).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
       quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n).fit })).map(({ qq, fit }) => ({
         name: qq.label, meta: [quantNote(qq.id, m.total_params_b), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
         fitColor: fit === 'no' ? fitColors.no : fit === 'partial' ? fitColors.partial : '',
@@ -1066,7 +1067,7 @@ export class App extends Component<{}, St> {
                         {r.modelOpts.length === 0 && <div style="padding:10px; font-size:12.5px; color:var(--c-text-muted)">No model matches "{r.modelQ}"</div>}
                         {r.modelOpts.map((o, j) => o.hdr
                           ? <div key={j} style={o.hdrStyle}><span style={o.dotStyle}></span>{o.label}</div>
-                          : <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style="display:inline-flex; align-items:center; gap:7px; min-width:0"><span style="width:22px; flex-shrink:0; display:inline-flex; justify-content:center">{o.mark && <span title={o.mark.tip} aria-label={o.mark.tip} style={o.mark.style}>{o.mark.text}</span>}</span><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{o.name}</span></span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint); flex-shrink:0">{o.meta}</span></button>)}
+                          : <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style="display:inline-flex; align-items:center; gap:7px; min-width:0; flex-shrink:0; max-width:60%"><span style="width:22px; flex-shrink:0; display:inline-flex; justify-content:center">{o.mark && <span title={o.mark.tip} aria-label={o.mark.tip} style={o.mark.style}>{o.mark.text}</span>}</span><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{o.name}</span></span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint); text-align:right">{o.meta}</span></button>)}
                       </div>
                     </div>
                   )}
