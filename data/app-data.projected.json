@@ -2074,13 +2074,23 @@
  ],
  "benchmarks": [
   {
-   "id": "tb21",
-   "name": "Terminal-Bench 2.1",
-   "short": "TB 2.1",
+   "id": "arena_webdev",
+   "name": "LMArena WebDev",
+   "short": "Arena WebDev",
+   "unit": "",
+   "axis": "elo",
+   "released": "2026-10-22",
+   "url": "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+   "note": "Crowd Elo from votes on generated web apps (Code Arena). Its own scale, not comparable with Arena Text. Some entries have few votes. Snapshot 2026-10-22."
+  },
+  {
+   "id": "tb40",
+   "name": "Terminal-Bench 4.0",
+   "short": "TB 4.0",
    "unit": "%",
-   "released": "2026-05-06",
-   "url": "https://www.tbench.ai/news/terminal-bench-2-1",
-   "note": "Agentic tasks in a terminal (89 tasks). Harnesses differ (Claude Code, Terminus, AA's own) and move scores by 5-7 points."
+   "released": "2026-08-28",
+   "url": "https://www.tbench.ai/news/terminal-bench-4-0",
+   "note": "Agentic tasks in a terminal (66 tasks, 8-hour agent timeout). Scores are Artificial Analysis runs in mini-swe-agent; lab harnesses on the official board (Claude Code, Codex, Grok Build) move a model by up to 12 points."
   },
   {
    "id": "aa_index",
@@ -2090,33 +2100,6 @@
    "released": "2026-09-07",
    "url": "https://artificialanalysis.ai/articles/artificial-analysis-intelligence-index-v4-3",
    "note": "Composite of 10 evals (Terminal-Bench 4.0, HLE, GDPval-AA, SciCode and others), 0-100. AA marks some older models' values as estimates."
-  },
-  {
-   "id": "aime26",
-   "name": "AIME 2026",
-   "short": "AIME 26",
-   "unit": "%",
-   "released": "2026-02-05",
-   "url": "https://matharena.ai/?comp=aime--aime_2026",
-   "note": "30 competition math problems, no tools. Near-saturated for reasoning models."
-  },
-  {
-   "id": "tau3_banking",
-   "name": "\u03c4\u00b3-bench Banking",
-   "short": "\u03c4\u00b3 Banking",
-   "unit": "%",
-   "released": "2026-03-18",
-   "url": "https://github.com/sierra-research/tau2-bench/releases",
-   "note": "Tool-using customer-service agent with retrieval over 698 bank policy docs. AA and NVIDIA run the banking domain only."
-  },
-  {
-   "id": "deepswe_v11",
-   "name": "DeepSWE v1.1",
-   "short": "DeepSWE",
-   "unit": "%",
-   "released": "2026-06-14",
-   "url": "https://deepswe.datacurve.ai/blog/deepswe-v1-1",
-   "note": "113 long-horizon software tasks across 91 repos, pass@1 with mini-swe-agent. Epoch rates v1.1 as flawed (grading false negatives on 23+ tasks)."
   },
   {
    "id": "arena_text",
@@ -2129,14 +2112,40 @@
    "note": "Crowd Elo from blind side-by-side chat votes, style control on (the site default). Measures how much people prefer the answers; it favors polished formatting and says little about agentic work. Snapshot 2026-10-22."
   },
   {
-   "id": "arena_webdev",
-   "name": "LMArena WebDev",
-   "short": "Arena WebDev",
-   "unit": "",
-   "axis": "elo",
-   "released": "2026-10-22",
-   "url": "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
-   "note": "Crowd Elo from votes on generated web apps (Code Arena). Its own scale, not comparable with Arena Text. Some entries have few votes. Snapshot 2026-10-22."
+   "id": "deepswe_v11",
+   "name": "DeepSWE v1.1",
+   "short": "DeepSWE",
+   "unit": "%",
+   "released": "2026-06-14",
+   "url": "https://deepswe.datacurve.ai/blog/deepswe-v1-1",
+   "note": "113 long-horizon software tasks across 91 repos, pass@1 with mini-swe-agent. Epoch rates v1.1 as flawed (grading false negatives on 23+ tasks)."
+  },
+  {
+   "id": "tau3_banking",
+   "name": "\u03c4\u00b3-bench Banking",
+   "short": "\u03c4\u00b3 Banking",
+   "unit": "%",
+   "released": "2026-03-18",
+   "url": "https://github.com/sierra-research/tau2-bench/releases",
+   "note": "Tool-using customer-service agent with retrieval over 698 bank policy docs. AA and NVIDIA run the banking domain only."
+  },
+  {
+   "id": "aime26",
+   "name": "AIME 2026",
+   "short": "AIME 26",
+   "unit": "%",
+   "released": "2026-02-05",
+   "url": "https://matharena.ai/?comp=aime--aime_2026",
+   "note": "30 competition math problems, no tools. Near-saturated for reasoning models."
+  },
+  {
+   "id": "tb21",
+   "name": "Terminal-Bench 2.1",
+   "short": "TB 2.1",
+   "unit": "%",
+   "released": "2026-05-06",
+   "url": "https://www.tbench.ai/news/terminal-bench-2-1",
+   "note": "Agentic tasks in a terminal (89 tasks). Harnesses differ (Claude Code, Terminus, AA's own) and move scores by 5-7 points. Retired in September 2026 in favour of TB 4.0, so newer models only have self-reported scores here."
   }
  ],
  "scores": {
@@ -2147,7 +2156,8 @@
    "aa_index": 33.7,
    "_note": "Qwen3.8-27B, thinking. Qwen3.6-27B scores lower: TB 2.1 60.7, AIME 26 94.1, AA 21.4",
    "arena_text": 1437.1,
-   "arena_webdev": 1591.3
+   "arena_webdev": 1591.3,
+   "tb40": 5.6
   },
   "qwen3.8-flash-next": {
    "deepswe_v11": 58.7,
@@ -2155,7 +2165,8 @@
    "tau3_banking": 45.4,
    "aa_index": 39.8,
    "_note": "thinking",
-   "arena_webdev": 1628.0
+   "arena_webdev": 1628.0,
+   "tb40": 25.3
   },
   "glm-5.3-flash": {
    "tb21": 84.3,
@@ -2164,7 +2175,8 @@
    "aa_index": 41.8,
    "_note": "reasoning effort max",
    "arena_text": 1476.0,
-   "arena_webdev": 1607.8
+   "arena_webdev": 1607.8,
+   "tb40": 32.8
   },
   "gemma-4-26b-a4b": {
    "aime26": 88.3,
@@ -2187,7 +2199,8 @@
    "tb21": 44.9,
    "tau3_banking": 9.3,
    "aa_index": 18.2,
-   "_note": "thinking"
+   "_note": "thinking",
+   "tb40": 0.0
   },
   "gemma-4-31b": {
    "aime26": 89.2,
@@ -2195,14 +2208,16 @@
    "tau3_banking": 14.8,
    "aa_index": 14.7,
    "arena_text": 1452.3,
-   "arena_webdev": 1368.2
+   "arena_webdev": 1368.2,
+   "tb40": 0.0
   },
   "qwen3.5-9b": {
    "aime26": 92.5,
    "tb21": 29.2,
    "tau3_banking": 7.0,
    "aa_index": 11.2,
-   "_note": "thinking"
+   "_note": "thinking",
+   "tb40": 0.5
   },
   "deepseek-v4-flash": {
    "aime26": 95.8,
@@ -2220,7 +2235,11 @@
    "aa_index": 39.5,
    "_note": "max effort, 0910 release; the 1017 re-release has AA 45.1; LMArena lists only the max-reasoning variant",
    "arena_text": 1476.0,
-   "arena_webdev": 1618.4
+   "arena_webdev": 1618.4,
+   "tb40": 31.2,
+   "_vendor": [
+    "tb40"
+   ]
   },
   "gpt-oss-120b": {
    "tb21": 26.2,
@@ -2251,14 +2270,16 @@
    "arena_webdev": 1622.7,
    "_vendor": [
     "tb21"
-   ]
+   ],
+   "tb40": 41.9
   },
   "nemotron-3.5-lightning-30b-a3b": {
    "tb21": 24.6,
    "tau3_banking": 9.3,
    "aa_index": 12.9,
    "_note": "reasoning on",
-   "arena_text": 1353.0
+   "arena_text": 1353.0,
+   "tb40": 0.5
   },
   "kimi-k2.6": {
    "aime26": 96.4,
@@ -2274,7 +2295,8 @@
    "tb21": 67.4,
    "tau3_banking": 20.2,
    "aa_index": 25.8,
-   "arena_webdev": 1473.5
+   "arena_webdev": 1473.5,
+   "tb40": 1.0
   },
   "qwen3-coder-480b-a35b": {
    "aa_index": 11.9,
@@ -2289,7 +2311,8 @@
   "qwen3-coder-next": {
    "tb21": 38.2,
    "tau3_banking": 5.4,
-   "aa_index": 9.2
+   "aa_index": 9.2,
+   "tb40": 0.0
   },
   "qwen3-235b-a22b-2507": {
    "tb21": 12.0,
@@ -2331,7 +2354,8 @@
    "_vendor": [
     "tb21",
     "deepswe_v11"
-   ]
+   ],
+   "tb40": 34.8
   },
   "mimo-v2.6-flash": {
    "tb21": 87.6,
@@ -2342,7 +2366,8 @@
    "_vendor": [
     "tb21",
     "deepswe_v11"
-   ]
+   ],
+   "tb40": 22.7
   },
   "minimax-m3": {
    "tb21": 65.2,
@@ -2350,7 +2375,8 @@
    "tau3_banking": 15.3,
    "arena_text": 1439.8,
    "arena_webdev": 1482.4,
-   "_note": "TB 2.1 is AA's own run; MiniMax reports 66.0"
+   "_note": "TB 2.1 is AA's own run; MiniMax reports 66.0",
+   "tb40": 2.0
   },
   "minimax-m3.1-flash": {
    "aa_index": 42.7,
@@ -2359,7 +2385,8 @@
    "_note": "Arena WebDev has only 2,164 votes",
    "_vendor": [
     "deepswe_v11"
-   ]
+   ],
+   "tb40": 25.8
   }
  },
  "released": {
@@ -2506,7 +2533,8 @@
     "_note": "max effort; AA index is the Max, Default Fallback run; Arena Text lists only the High variant; DeepSWE is the Opus 5.5 (max) figure in Google's Gemini 4 Argon and Meta's Muse Wonder tables, not on the DeepSWE leaderboard. Anthropic reports Terminal-Bench 4.0, not 2.1",
     "_vendor": [
      "deepswe_v11"
-    ]
+    ],
+    "tb40": 59.6
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2525,7 +2553,8 @@
     "aa_index": 56.0,
     "arena_text": 1477.5,
     "arena_webdev": 1767.5,
-    "_note": "AA index is the Max, Default Fallback run; Arena entries are the xHigh variant (WebDev High scores 1706.4)"
+    "_note": "AA index is the Max, Default Fallback run; Arena entries are the xHigh variant (WebDev High scores 1706.4)",
+    "tb40": 63.6
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2545,7 +2574,8 @@
     "deepswe_v11": 73.2,
     "arena_text": 1476.5,
     "arena_webdev": 1774.7,
-    "_note": "reasoning effort max; xhigh scores TB 2.1 89.1, tau3 banking 43.1, DeepSWE 74.1 (the figure rivals quote)"
+    "_note": "reasoning effort max; xhigh scores TB 2.1 89.1, tau3 banking 43.1, DeepSWE 74.1 (the figure rivals quote)",
+    "tb40": 59.1
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2567,7 +2597,8 @@
     "_note": "reasoning effort max for AA and Arena; DeepSWE is OpenAI's launch figure (reported at high effort), read via secondary coverage because openai.com blocked the fetch",
     "_vendor": [
      "deepswe_v11"
-    ]
+    ],
+    "tb40": 56.1
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2589,7 +2620,8 @@
     "_note": "High thinking; announced 2026-09-30 for limited access, generally available 2026-10-13; Arena WebDev has only 2,680 votes",
     "_vendor": [
      "deepswe_v11"
-    ]
+    ],
+    "tb40": 57.1
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2610,7 +2642,8 @@
     "deepswe_v11": 73.8,
     "arena_text": 1495.7,
     "arena_webdev": 1585.3,
-    "_note": "High thinking"
+    "_note": "High thinking",
+    "tb40": 19.7
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2632,7 +2665,8 @@
     "_note": "xHigh effort; xAI's DeepSWE figure is at high effort",
     "_vendor": [
      "deepswe_v11"
-    ]
+    ],
+    "tb40": 25.8
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2653,7 +2687,8 @@
     "_note": "max effort; the API model. Subscription-only Muse Wonder Full scores AA 55.8, DeepSWE 79.0 (Meta), Arena WebDev 1725.9",
     "_vendor": [
      "deepswe_v11"
-    ]
+    ],
+    "tb40": 52.0
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
@@ -2673,7 +2708,8 @@
     "deepswe_v11": 57.5,
     "arena_text": 1482.9,
     "arena_webdev": 1673.2,
-    "_note": "0902 snapshot, reasoning; DeepSWE at xhigh"
+    "_note": "0902 snapshot, reasoning; DeepSWE at xhigh",
+    "tb40": 38.9
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",

@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/534b4736-6b59-426e-bc0a-e93a196156b9
 - **Memory fit:** see whether a model fits at each quantization, needs partial offload to system RAM, or won't run at all
 - **30 GPUs, Macs and CPUs × 21 open models released since December 2025**, across CUDA, Metal, ROCm, Vulkan and CPU
 - **Multi-device setups:** 2 to 8 devices joined over Thunderbolt 5 RDMA (Macs), ConnectX-7 (DGX Spark), PCIe (GPUs in one PC) or Ethernet (llama.cpp RPC), with measured cluster runs shown next to the estimate
-- **Model quality chart:** 2026 benchmark scores (Terminal-Bench 2.1, AA Index, AIME 2026, τ³-bench, DeepSWE) for every listed model, with closed API models as reference bars, highlighting what runs on your setup
+- **Model quality chart:** 2026 benchmark scores (LMArena WebDev by default, Terminal-Bench 4.0 and 2.1, AA Index, LMArena Text, DeepSWE, τ³-bench, AIME 2026) for every listed model, with closed API models as reference bars, highlighting what runs on your setup
 - **Workload verdicts and a [guide](https://llmspeed.dev/guide/):** what a given tok/s means for chat, coding help, coding agents and reasoning models, and what each quantization costs in quality
 - **Shareable links** to any setup or race
 
