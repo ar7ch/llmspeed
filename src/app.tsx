@@ -19,7 +19,7 @@ const CONFIG = {
 }
 
 const REPO = 'nicorobinreal/llmspeed'
-// search landing page this URL maps to (e.g. /llama-3.1-8b-on-rtx-4090/); 'home' for the root
+// search landing page this URL maps to (e.g. /qwen3.6-27b-on-rtx-4090/); 'home' for the root
 const PAGE = typeof location !== 'undefined' ? pageFromPath(location.pathname) : pageFromPath('/')
 const PAGE_META = pageMeta(PAGE)
 // below this the count reads as anti-social-proof, so the pills just say "Star"
@@ -69,7 +69,7 @@ const EMPTY_LANE: LaneSt = { phase: 'prefill', prefillT: 0, text: '', liveTok: 0
 export class App extends Component<{}, St> {
   state: St = (() => {
     const base: St = {
-      cfgs: [{ hw: 'rtx-4090', model: 'llama-3.1-8b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
+      cfgs: [{ hw: 'rtx-4090', model: 'qwen3.6-27b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
       streamText: '', liveTok: 0, prefillT: 0, breakdownOpen: false, history: [],
       dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', floor: 10, kvq: 'f16', macRaised: false, bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
       // index.html picks the theme before first paint (saved choice, else system setting)

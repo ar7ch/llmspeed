@@ -2,14 +2,13 @@
 // that run on the selected setup in the accent color. Scores are for full-precision weights;
 // quantization costs some of it (see the quant notes).
 import { Component } from 'preact'
-import { BENCHES, HW, MODELS, type Bench, isVendorScore, nativeLowBit, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
+import { BENCHES, CLOSED, dateLabel, HW, MIN_RELEASED, MODELS, type Bench, type ClosedRef, isVendorScore, nativeLowBit, macLimitNote, releasedLabel, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type Opts } from './calc'
 
 const ACCENT = 'oklch(0.62 0.17 30)'
 
-// only models and benchmark editions from 2026 on; older ones compare poorly with current ones
-const SINCE = '2026-01-01'
-const CURRENT = MODELS.filter(m => releasedOf(m.id) >= SINCE)
+// MODELS already leaves out models released before MIN_RELEASED
+const CURRENT = MODELS
 const BY_GB = [...HW].sort((a, b) => b.vram_gb - a.vram_gb || a.popularity_rank - b.popularity_rank)
 
 /** 1- or 2-bit quants: these lose real quality, so a published full-precision score overstates them */
@@ -21,7 +20,7 @@ const VENDOR = "self-reported by the model's maker, not an independent run"
 export const fmtScore = (x: number) => x.toFixed(1).replace(/\.0$/, '')
 
 interface Props { hw: Hw; n: number; bench: string; setBench: (id: string) => void; floor: number; setFloor: (f: number) => void; ctx: number; model: string; pick: (m: Model, q: Quant) => void; setHw: (hw: Hw, n: number) => void; opts: Opts }
-interface St { sort: 'score' | 'speed'; hover: string | null }
+interface St { sort: 'score' | 'speed'; hover: string | null; showClosed: boolean }
 
 /** the quant to run: the largest Q4 that fits, else the largest that fits, else the smallest */
 function bestRun(hw: Hw, n: number, m: Model, ctx: number, opts: Opts): { q: Quant; c: CalcResult } {
@@ -52,7 +51,7 @@ export const FLOORS = [5, 10, 20]
 
 export interface Ranked { m: Model; s: number; ok: boolean; q: Quant; c: CalcResult; adj: number }
 
-/** Best pick: for each 2026 model with a score on `b`, the quant with the highest quality-adjusted
+/** Best pick: for each listed model with a score on `b`, the quant with the highest quality-adjusted
  *  score that fits and still runs at the speed floor (`ok`), else the best one that fits at all.
  *  Quants within 2.5% of the best adjusted score count as equal and the fastest wins, so Q4 beats
  *  a 2x slower Q8 or FP16. Models that don't fit are left out. */
@@ -73,9 +72,9 @@ export function rankModels(hw: Hw, n: number, ctx: number, b: Bench, floor: numb
 }
 
 export class BenchChart extends Component<Props, St> {
-  state: St = { sort: 'score', hover: null }
+  state: St = { sort: 'score', hover: null, showClosed: true }
 
-  render({ hw, n, bench, setBench, floor, setFloor, ctx, model, pick, setHw, opts }: Props, { sort, hover }: St) {
+  render({ hw, n, bench, setBench, floor, setFloor, ctx, model, pick, setHw, opts }: Props, { sort, hover, showClosed }: St) {
     const b = BENCHES.find(x => x.id === bench)
     if (!b) return null
     const rows = CURRENT.map(m => ({ m, s: scoresOf(m.id)[b.id] as number | undefined, ...bestRun(hw, n, m, ctx, opts) }))
@@ -83,7 +82,10 @@ export class BenchChart extends Component<Props, St> {
     const tps = (r: { c: CalcResult }) => r.c.fit === 'no' ? -1 : r.c.base
     const scored = rows.filter(r => typeof r.s === 'number').sort((x, y) => (sort === 'speed' ? tps(y) - tps(x) : 0) || y.s! - x.s!)
     const missing = rows.filter(r => typeof r.s !== 'number')
-    const hi = Math.max(...scored.map(r => r.s!)), lo = Math.min(...scored.map(r => r.s!))
+    // closed API models sit among the open ones by score, for reference; they don't rank or load
+    const refs = showClosed && sort === 'score' ? CLOSED.filter(r => typeof r.scores[b.id] === 'number').map(ref => ({ ref, s: ref.scores[b.id] as number })) : []
+    const list: ({ ref: ClosedRef; s: number } | (typeof scored)[number])[] = [...scored, ...refs].sort((x, y) => sort === 'speed' ? 0 : y.s! - x.s!)
+    const hi = Math.max(...scored.map(r => r.s!), ...refs.map(r => r.s)), lo = Math.min(...scored.map(r => r.s!))
     // Elo bars start near the lowest score, otherwise every bar looks the same length
     const axisMin = b.axis === 'elo' ? Math.floor((lo - 60) / 50) * 50 : 0
     const max = b.unit === '%' ? 100 : b.axis === 'elo' ? hi + 20 : hi * 1.1
@@ -94,12 +96,13 @@ export class BenchChart extends Component<Props, St> {
     const slowerRank = slower ? picks.filter(p => p.adj > slower.adj).length + 1 : 0
     const runs = scored.filter(r => r.c.fit !== 'no').length
     const hv = scored.find(r => r.m.id === hover)
+    const hvRef = refs.find(r => 'closed:' + r.ref.id === hover)
     const tab = (act: boolean) => `border-radius:99px; padding:4px 11px; font-size:12px; cursor:pointer; white-space:nowrap; ${act ? 'background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)' : 'background:none; border:1px solid var(--c-border); color:var(--c-text-muted)'}`
     return (
       <section class="page-col" style="width:100%; max-width:780px; margin:0 auto; padding-top:40px">
         <h2 style="font-size:20px; font-weight:700; letter-spacing:-0.01em; color:var(--c-ink); margin:0 0 4px">How smart is each model?</h2>
         <p style="font-size:13.5px; color:var(--c-text-sec); margin:0 0 14px; line-height:1.55">
-          {b.name}{b.unit === '%' ? ' score (%)' : ''}. <span style={`display:inline-block; width:9px; height:9px; border-radius:2px; background:${ACCENT}`}></span> runs on <strong style="color:var(--c-ink)">{setupName(hw, n)}</strong> ({runs} of {scored.length}), faded with partial offload to system RAM, striped when only a 1–2 bit quant fits (expect a lower score than shown); gray doesn't fit. Click a bar to load that model.
+          {b.name}{b.unit === '%' ? ' score (%)' : ''}. <span style={`display:inline-block; width:9px; height:9px; border-radius:2px; background:${ACCENT}`}></span> runs on <strong style="color:var(--c-ink)">{setupName(hw, n)}</strong> ({runs} of {scored.length}), faded with partial offload to system RAM, striped when only a 1–2 bit quant fits (expect a lower score than shown); gray doesn't fit; outlined bars marked API are closed models for reference. Click a bar to load that model.
         </p>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px">
           <select aria-label="Hardware" class="bench-select" value={hw.id} onChange={e => { const h = HW.find(x => x.id === (e.target as HTMLSelectElement).value)!; setHw(h, nodeCounts(h).includes(n) ? n : 1) }}>
@@ -111,6 +114,7 @@ export class BenchChart extends Component<Props, St> {
           <span style="display:inline-flex; align-items:center; gap:4px; margin-left:auto">
             <span style="font-size:11px; color:var(--c-text-faint); padding:0 4px">Sort</span>
             {(['score', 'speed'] as const).map(k => <button key={k} onClick={() => this.setState({ sort: k })} style={tab(sort === k)}>{k === 'score' ? 'Score' : 'Speed'}</button>)}
+            {CLOSED.length > 0 && <button onClick={() => this.setState({ showClosed: !showClosed })} aria-pressed={showClosed} style={tab(showClosed)} title="Closed API models for reference (score sort only)">Closed models</button>}
           </span>
         </div>
         <div class="best-pick">
@@ -119,7 +123,7 @@ export class BenchChart extends Component<Props, St> {
             <span style="font-size:11px; color:var(--c-text-faint)">At least</span>
             {FLOORS.map(f => <button key={f} onClick={() => setFloor(f)} style={tab(floor === f)}>{f} tok/s</button>)}
           </div>
-          {picks.length === 0 ? <div style="font-size:13px; color:var(--c-text-sec); margin-top:8px">No 2026 model with a {b.short} score fits here at {floor}+ tok/s.</div> : picks.map((p, i) => (
+          {picks.length === 0 ? <div style="font-size:13px; color:var(--c-text-sec); margin-top:8px">No listed model with a {b.short} score fits here at {floor}+ tok/s.</div> : picks.map((p, i) => (
             <div key={p.m.id} style={`display:flex; align-items:center; gap:12px; margin-top:${i ? 6 : 10}px`}>
               <div style="flex:1; min-width:0">
                 <div style={`font-size:${i ? 13.5 : 17}px; font-weight:${i ? 500 : 650}; color:var(--c-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap`}>{i ? `${i + 1}. ` : ''}{p.m.name} <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:400; color:var(--c-text-muted)">{p.q.label}</span></div>
@@ -140,7 +144,21 @@ export class BenchChart extends Component<Props, St> {
           {BENCHES.map(x => <button key={x.id} role="tab" aria-selected={x.id === bench} onClick={() => { setBench(x.id); this.setState({ hover: null }) }} style={tab(x.id === bench)}>{x.short}</button>)}
         </div>
         <div style="display:flex; flex-direction:column; gap:2px" onMouseLeave={() => this.setState({ hover: null })}>
-          {scored.map(r => {
+          {list.map(r => {
+            if ('ref' in r) {
+              const w = Math.max(1, (r.s - axisMin) / (max - axisMin) * 85)
+              return (
+                <div key={'closed:' + r.ref.id} onMouseEnter={() => this.setState({ hover: 'closed:' + r.ref.id })}
+                  class="bench-row" style={`display:grid; align-items:center; gap:10px; width:100%; padding:3px 4px; border-radius:6px; background:${hover === 'closed:' + r.ref.id ? 'var(--c-bg-subtle)' : 'none'}`}>
+                  <span style="font-size:12.5px; color:var(--c-text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap"><span style="font-size:9.5px; font-weight:600; letter-spacing:0.04em; color:var(--c-text-muted); border:1px solid var(--c-border-strong); border-radius:4px; padding:0 3px; margin-right:5px">API</span>{r.ref.name}</span>
+                  <span style="display:flex; align-items:center; gap:6px; min-width:0">
+                    <span style={`height:14px; width:${w}%; box-sizing:border-box; border:1.5px solid var(--c-text-faint); border-left:none; border-radius:0 4px 4px 0; flex-shrink:0`}></span>
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--c-text-muted)" title={r.ref.scores._vendor?.includes(b.id) ? VENDOR : undefined}>{fmtScore(r.s)}{r.ref.scores._vendor?.includes(b.id) && '*'}</span>
+                  </span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint); text-align:right; white-space:nowrap">API only</span>
+                </div>
+              )
+            }
             const ok = r.c.fit !== 'no', sel = r.m.id === model, lb = ok ? lowBits(r.q) : 0
             const fill = !ok ? 'var(--c-border-strong)' : lb ? `repeating-linear-gradient(45deg, ${ACCENT} 0 3px, transparent 3px 6px)` : ACCENT
             // NOTE: 85% leaves room for the score label at the bar tip
@@ -161,7 +179,9 @@ export class BenchChart extends Component<Props, St> {
           })}
         </div>
         <div style="min-height:40px; margin-top:10px; font-size:12.5px; color:var(--c-text-sec); line-height:1.5">
-          {hv ? <>
+          {hvRef ? <>
+            <strong style="color:var(--c-ink)">{hvRef.ref.name}</strong> ({hvRef.ref.maker}, {dateLabel(hvRef.ref.released)}): {fmtScore(hvRef.s)}{b.unit} on {b.short}{hvRef.ref.scores._note ? ` (${hvRef.ref.scores._note})` : ''}{hvRef.ref.scores._vendor?.includes(b.id) ? `, ${VENDOR}` : ''}. Closed weights, API only: shown for reference, it can't run locally.
+          </> : hv ? <>
             <strong style="color:var(--c-ink)">{hv.m.name}</strong>{releasedLabel(hv.m.id) && ` (${releasedLabel(hv.m.id)})`}: {fmtScore(hv.s!)}{b.unit} on {b.short}{scoresOf(hv.m.id)._note ? ` (${scoresOf(hv.m.id)._note})` : ''}{isVendorScore(hv.m.id, b.id) ? `, ${VENDOR}` : ''}.{' '}
             {hv.c.fit === 'no' ? `Needs ${hv.c.total.toFixed(0)} GB even at ${hv.q.label}; ${setupName(hw, n)} has ${hv.c.usable.toFixed(0)} GB usable.`
               : `${lowBits(hv.q) ? `Only fits at ${hv.q.label}, a ${lowBits(hv.q)}-bit quant: expect a clearly lower score than the full-precision one shown. ` : ''}Runs at ${hv.q.label}: ${fmt(hv.c.lo)}–${fmt(hv.c.hi)} tok/s, ${hv.c.total.toFixed(0)} of ${hv.c.usable.toFixed(0)} GB${hv.c.fit === 'partial' ? ', part offloaded to system RAM' : ''}.`}
@@ -173,7 +193,7 @@ export class BenchChart extends Component<Props, St> {
           const more = scored.filter(r => r.c.fit === 'no' && quantsFor(r.m).some(q => calc(hw, r.m, q, ctx, n, opts).total <= macRaisedUsable(hw, n))).length
           return <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">{macLimitNote(hw, n, opts.macRaised)}{!opts.macRaised && more > 0 && ` That would let ${more} more model${more > 1 ? 's' : ''} here fit.`}</p>
         })()}
-        <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Showing models and benchmark editions released in 2026; {MODELS.length - CURRENT.length} older models are hidden.</p>
+        <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Showing 2026 benchmark editions and models released since {dateLabel(MIN_RELEASED)}.</p>
         <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Scores come from Artificial Analysis, LMArena, benchmark leaderboards and model makers, at full precision; * marks a score {VENDOR}. Quantization lowers them a little at Q4 and a lot below Q3 on small models.</p>
       </section>
     )

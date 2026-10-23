@@ -115,6 +115,8 @@ export interface Bench {
 /** published scores per model id; `_note` says which variant or mode the scores belong to,
  *  `_vendor` lists the benchmark ids whose score only the model's maker has reported */
 export type Scores = Record<string, number | string | string[] | undefined> & { _note?: string; _vendor?: string[] }
+/** a closed-weight API model, shown in the quality chart for reference only */
+export interface ClosedRef { id: string; name: string; maker: string; released: string; scores: Scores; sources: string[] }
 
 /** throughput past the longest prompt preset falls as (1 + from/K) / (1 + ctx/K) */
 export interface LongCtx {
@@ -142,6 +144,7 @@ interface AppData {
   cluster_runs?: ClusterRun[]
   benchmarks?: Bench[]
   scores?: Record<string, Scores>
+  closed_refs?: ClosedRef[]
   long_context?: LongCtx
   /** first open-weights release, YYYY-MM-DD */
   released?: Record<string, string>
@@ -189,6 +192,7 @@ const DATA: AppData = {
   cluster_runs: EXTRA.cluster_runs,
   benchmarks: EXTRA.benchmarks,
   scores: EXTRA.scores,
+  closed_refs: EXTRA.closed_refs,
   released: EXTRA.released,
   long_context: EXTRA.long_context,
   projected_decode_eff: EXTRA.projected_decode_eff,
@@ -196,7 +200,10 @@ const DATA: AppData = {
 }
 
 export const HW: Hw[] = [...DATA.hardware].sort((a, b) => a.popularity_rank - b.popularity_rank)
-export const MODELS: Model[] = [...DATA.models].sort((a, b) => a.popularity_rank - b.popularity_rank)
+/** models released before this are hidden: they sit at the bottom of every 2026 benchmark. Their data stays
+ *  in the JSON, and the speed calibration constants were fitted with them */
+export const MIN_RELEASED = '2025-12-01'
+export const MODELS: Model[] = DATA.models.filter(m => (DATA.released?.[m.id] ?? '') >= MIN_RELEASED).sort((a, b) => a.popularity_rank - b.popularity_rank)
 export const PROMPT_PRESET_TOKS: number[] = DATA.prompt_presets
 
 /** Kimi ships native INT4, GPT-OSS and MiMo native MXFP4 weights, so their 4-bit files are full quality */
@@ -285,13 +292,13 @@ export const setupName = (hw: Hw, n: number) => n > 1 ? `${n}× ${hw.name}` : hw
 export const BENCHES: Bench[] = DATA.benchmarks ?? []
 export const releasedOf = (modelId: string) => DATA.released?.[modelId] ?? ''
 /** "Apr 2026", or '' when unknown */
-export const releasedLabel = (modelId: string) => {
-  const d = releasedOf(modelId)
-  return d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''
-}
+/** "Apr 2026" for a YYYY-MM-DD date, '' when missing */
+export const dateLabel = (d: string | undefined) => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''
+export const releasedLabel = (modelId: string) => dateLabel(releasedOf(modelId))
 export const scoresOf = (modelId: string): Scores => DATA.scores?.[modelId] ?? {}
 /** the score is self-reported by the model's maker, not an independent run */
 export const isVendorScore = (modelId: string, benchId: string) => scoresOf(modelId)._vendor?.includes(benchId) ?? false
+export const CLOSED: ClosedRef[] = DATA.closed_refs ?? []
 
 export const clusterRuns = (hwId: string, modelId: string) =>
   (DATA.cluster_runs ?? []).filter(r => r.hw === hwId && r.model === modelId).sort((a, b) => a.n - b.n)
