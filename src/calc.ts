@@ -54,7 +54,7 @@ function longCtx(ctx: number, k: number): number {
 
 // log-linear interpolation of the combo's per-preset prefill midpoints over context depth; past the
 // longest preset the long-context curve takes over instead of holding the rate flat
-function comboPrefill(cb: ComboPred | undefined, ctx: number): number | null {
+function comboPrefill(cb: ComboPred | undefined, ctx: number, prefillK: number): number | null {
   if (!cb || !cb.prefill_tps || !cb.prefill_tps.length) return null
   const n = Math.min(cb.prefill_tps.length, PROMPT_PRESET_TOKS.length)
   const mids = cb.prefill_tps.slice(0, n).map(([a, b]) => (a + b) / 2)
@@ -66,7 +66,7 @@ function comboPrefill(cb: ComboPred | undefined, ctx: number): number | null {
       return mids[i - 1] + (mids[i] - mids[i - 1]) * t
     }
   }
-  return mids[n - 1] * longCtx(ctx, LONG_CTX.prefill_k)
+  return mids[n - 1] * longCtx(ctx, prefillK)
 }
 
 export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult {
@@ -80,7 +80,10 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult
     : (n === 1 && hw.vendor !== 'apple' && hw.form_factor !== 'server' && total <= usable * 2.4 ? 'partial' : 'no')
   const moe = m.active_params_b < m.total_params_b
   const shortDerate = Math.pow(co.ctx_derate_per_8k, Math.min(ctx, LONG_CTX.from_tokens) / 8192)
-  const derate = shortDerate * longCtx(ctx, moe ? LONG_CTX.decode_k_moe : LONG_CTX.decode_k_dense)
+  const efficientAttn = LONG_CTX.efficient_attention.includes(m.id)
+  const decodeK = efficientAttn ? LONG_CTX.decode_k_efficient : moe ? LONG_CTX.decode_k_moe : LONG_CTX.decode_k_dense
+  const prefillK = efficientAttn ? LONG_CTX.prefill_k_efficient : LONG_CTX.prefill_k
+  const derate = shortDerate * longCtx(ctx, decodeK)
   const aw = w * (m.active_params_b / m.total_params_b)
   const cb = combo(hw.id, m.id, q.id)
   const eff = decodeEff(hw.backend, moe)
@@ -127,7 +130,7 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult
   if (hw.status === 'announced') conf = 'projected'
   const base = (lo + hi) / 2
 
-  let pre = (comboPrefill(cb, ctx) ?? (hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)) * shortDerate * longCtx(ctx, LONG_CTX.prefill_k)) * preF
+  let pre = (comboPrefill(cb, ctx, prefillK) ?? (hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)) * shortDerate * longCtx(ctx, prefillK)) * preF
   if (fit === 'partial') pre *= 0.5
   const ttft = ctx / pre + (fit === 'partial' ? 1.2 : 0.3)
 

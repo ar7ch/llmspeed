@@ -112,7 +112,16 @@ export interface Bench {
 export type Scores = Record<string, number | string | undefined> & { _note?: string }
 
 /** throughput past the longest prompt preset falls as (1 + from/K) / (1 + ctx/K) */
-export interface LongCtx { from_tokens: number; decode_k_dense: number; decode_k_moe: number; prefill_k: number }
+export interface LongCtx {
+  from_tokens: number
+  decode_k_dense: number
+  decode_k_moe: number
+  prefill_k: number
+  /** sliding-window / hybrid linear attention models slow down much less with depth */
+  decode_k_efficient: number
+  prefill_k_efficient: number
+  efficient_attention: string[]
+}
 
 interface AppData {
   prompt_presets: number[]
@@ -178,7 +187,7 @@ export function decodeEff(backend: Backend, moe: boolean): number {
   return e ? (moe ? e.moe : e.dense) : coeffs(backend).decode_bw_eff
 }
 
-export const LONG_CTX: LongCtx = DATA.long_context ?? { from_tokens: 12500, decode_k_dense: 100000, decode_k_moe: 50000, prefill_k: 30000 }
+export const LONG_CTX: LongCtx = DATA.long_context ?? { from_tokens: 12500, decode_k_dense: 100000, decode_k_moe: 50000, prefill_k: 30000, decode_k_efficient: 150000, prefill_k_efficient: 40000, efficient_attention: [] }
 
 export const OFFLOAD: OffloadCal = DATA.offload ?? { ram_bw_gbs: 55, err_q50: 1.5, err_q80: 2.0, n_rows: 0 }
 

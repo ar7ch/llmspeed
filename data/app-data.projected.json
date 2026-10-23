@@ -1594,7 +1594,25 @@
   "decode_k_dense": 100000,
   "decode_k_moe": 50000,
   "prefill_k": 30000,
-  "note": "Past from_tokens, speed scales by (1 + from/K) / (1 + ctx/K). Fit to llama.cpp long-context rows: Qwen3-30B-A3B and Devstral 2 on RTX 3090/4090/5090/PRO 6000 at 4K-262K.",
-  "source": "https://www.hardware-corner.net/gpu-llm-benchmarks/rtx-pro-6000-blackwell/"
+  "note": "Past from_tokens, speed scales by (1 + from/K) / (1 + ctx/K). Plain full-attention K values fit llama.cpp long-context rows for Qwen3-30B-A3B and Devstral 2 on RTX 3090/4090/5090/PRO 6000. Models with sliding-window or hybrid linear attention (listed in efficient_attention) slow down 2-3x less; their K values are medians of measured Mac (oMLX, Metal), Strix Halo and DGX Spark depth sweeps.",
+  "decode_k_efficient": 150000,
+  "prefill_k_efficient": 40000,
+  "efficient_attention": [
+   "gemma-4-26b-a4b",
+   "gemma-4-31b",
+   "gemma-4-12b",
+   "gpt-oss-20b",
+   "gpt-oss-120b",
+   "qwen3.6-27b",
+   "qwen3.6-35b-a3b",
+   "qwen3.5-9b",
+   "qwen3-coder-next"
+  ],
+  "sources": [
+   "https://www.hardware-corner.net/gpu-llm-benchmarks/rtx-pro-6000-blackwell/",
+   "https://github.com/kyuz0/amd-strix-halo-toolboxes/tree/main/benchmark/results",
+   "https://omlx.ai/benchmarks/66ckcde6",
+   "https://github.com/ggml-org/llama.cpp/blob/master/benches/dgx-spark/dgx-spark.md"
+  ]
  }
 }
