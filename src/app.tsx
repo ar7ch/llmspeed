@@ -2,7 +2,7 @@ import { Component, type ComponentChild } from 'preact'
 import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, macCanRaise, macUsable, BENCHES, scoresOf, isVendorScore, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ, type Opts } from './calc'
 import { track } from './analytics'
-import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
+import { pageFromPath, pageMeta, pageCfg, SeoSection, settingsQuery } from './seo'
 import { BenchChart, fmtScore, rankModels } from './bench'
 import { quantNote, workloads } from './guide'
 
@@ -78,7 +78,15 @@ export class App extends Component<{}, St> {
       isMobile: typeof matchMedia !== 'undefined' && matchMedia('(max-width:640px)').matches, cfgOpen: false, composerH: 140,
       pendingShare: false, stars: null,
     }
-    const pc = pageCfg(PAGE, base.cfgs[0])
+    // settings apply on every page, so links to the hardware and model pages can carry them; they
+    // are read first because the page's starting quant depends on them
+    try {
+      const qs = new URLSearchParams(location.search)
+      const kv = qs.get('kv')
+      if (kv && Object.keys(KV_BYTES).includes(kv)) base.kvq = kv as KvQ
+      if (qs.get('mac') === 'raised') base.macRaised = true
+    } catch (e) { }
+    const pc = pageCfg(PAGE, base.cfgs[0], { kvq: base.kvq, macRaised: base.macRaised })
     if (pc) base.cfgs = [pc]
     // share links are applied before the first render so the hero never flashes
     try {
@@ -94,9 +102,6 @@ export class App extends Component<{}, St> {
           if (ch && cm && cm.quants[cfg.quant]) cfgs.push({ ...cfg, n: clampNodes(ch, ns[i] || ns[0]) })
         }
         if (cfgs.length) base.cfgs = cfgs
-        const kv = qs.get('kv')
-        if (kv && Object.keys(KV_BYTES).includes(kv)) base.kvq = kv as KvQ
-        if (qs.get('mac') === 'raised') base.macRaised = true
         const p = qs.get('preset')
         if (p !== null && PRESETS[+p]) base.preset = +p
         const t = qs.get('prompt')
@@ -763,6 +768,7 @@ export class App extends Component<{}, St> {
       starClick: (button: 'nav' | 'cta') => track('star-click', { button }),
       // post-run ask: shown whenever a run has finished
       showStarCta: s.phase === 'done',
+      settingsQuery: settingsQuery(this.opts()),
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
       wontRun: !compare && c0.fit === 'no' && !busy && !(collapse && s.cfgOpen),
       wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${r._hw.vendor === 'apple' && c0.total <= macRaisedUsable(r._hw, c0.n) ? `It fits with macOS's GPU memory limit raised: pick "raised" under GPU memory in the hardware menu, or run sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(r._hw)}${c0.n > 1 ? ' on each Mac' : ''}. ` : suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
@@ -907,7 +913,7 @@ export class App extends Component<{}, St> {
             setHw={(h, n) => this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, hw: h.id, n } : c) }))}
             pick={(m, q) => { this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, model: m.id, quant: q.id } : c) })); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
         })()}
-        {v.heroMode && <SeoSection page={PAGE} />}
+        {v.heroMode && <SeoSection page={PAGE} opts={this.opts()} />}
         </div>
         {v.collapse && v.cfgOpen && <div style={v.cfgPanelStyle}>{this.renderConfigBlock(v)}</div>}
         {!v.heroMode && this.renderComposer(v)}
@@ -1200,8 +1206,8 @@ export class App extends Component<{}, St> {
                 )}
                 <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px">
                   <a href="/guide/" class="pill-link">What these mean</a>
-                  <a href={`/hardware/${v.cfgRows[0]._hw.id}/#fit`} class="pill-link">Every model on this hardware →</a>
-                  <a href={`/models/${v.cfgRows[0]._m.id}/#fit`} class="pill-link">Hardware that runs this model →</a>
+                  <a href={`/hardware/${v.cfgRows[0]._hw.id}/${v.settingsQuery}#fit`} class="pill-link">Every model on this hardware →</a>
+                  <a href={`/models/${v.cfgRows[0]._m.id}/${v.settingsQuery}#fit`} class="pill-link">Hardware that runs this model →</a>
                 </div>
               </div>
             )}

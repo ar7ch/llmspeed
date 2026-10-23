@@ -2,10 +2,11 @@
 // per-model index pages. The same <SeoSection> renders into the prerendered HTML at build time
 // (src/prerender.tsx) and below the hero in the live app, so crawlers with and without JS see
 // identical content. Must stay free of window/document access.
-import type { ComponentChildren } from 'preact'
+import { createContext, type ComponentChildren } from 'preact'
+import { useContext } from 'preact/hooks'
 import { GuideSection } from './guide'
 import { HW, MODELS, PRESETS, quantsFor, releasedLabel, type Hw, type Model, type Quant } from './data'
-import { calc, fmt, type CalcResult } from './calc'
+import { calc, DEFAULT_OPTS, fmt, type CalcResult, type Opts } from './calc'
 
 export const SITE = 'https://llmspeed.dev'
 
@@ -57,15 +58,25 @@ export function allPages(): Page[] {
 
 const CTX = PRESETS[0].tok
 
+/** '?kv=…&mac=raised' for non-default settings, '' otherwise */
+export function settingsQuery(o: Opts): string {
+  const q = new URLSearchParams()
+  if (o.kvq !== 'f16') q.set('kv', o.kvq)
+  if (o.macRaised) q.set('mac', 'raised')
+  const t = q.toString()
+  return t ? '?' + t : ''
+}
+
 /** the quant a landing page leads with: the largest Q4 that fits, else the largest that fits, else the smallest */
-export function pickQuant(hw: Hw, m: Model): Quant {
+export function pickQuant(hw: Hw, m: Model, o: Opts = DEFAULT_OPTS): Quant {
   const qs = quantsFor(m)
-  const fits = qs.filter(q => calc(hw, m, q, CTX).fit === 'fits')
+  const fits = qs.filter(q => calc(hw, m, q, CTX, 1, o).fit === 'fits')
   const q4 = fits.filter(q => /q4/.test(q.id))
   return q4[q4.length - 1] ?? fits[fits.length - 1] ?? qs[0]
 }
 
-const est = (hw: Hw, m: Model, q: Quant = pickQuant(hw, m)) => ({ q, c: calc(hw, m, q, CTX) })
+// the prerendered pages use the default settings; the app passes the visitor's cache type and Mac limit
+const est = (hw: Hw, m: Model, o: Opts = DEFAULT_OPTS, q: Quant = pickQuant(hw, m, o)) => ({ q, c: calc(hw, m, q, CTX, 1, o) })
 const runs = (c: CalcResult) => c.fit !== 'no'
 const speed = (c: CalcResult) => runs(c) ? `${fmt(c.base)} tok/s` : "Won't run"
 const ttft = (c: CalcResult) => runs(c) ? `${c.ttft < 10 ? c.ttft.toFixed(1) : Math.round(c.ttft)} s` : '—'
@@ -123,7 +134,9 @@ export function pageMeta(p: Page): PageMeta {
   }
 }
 
-const A = ({ p, children }: { p: Page; children: ComponentChildren }) => <a href={pathOf(p)}>{children}</a>
+/** query string with the visitor's non-default settings, so links between pages keep them */
+const SettingsQuery = createContext('')
+const A = ({ p, children }: { p: Page; children: ComponentChildren }) => <a href={pathOf(p) + useContext(SettingsQuery)}>{children}</a>
 
 function LinkList({ items }: { items: { p: Page; label: string; meta?: string }[] }) {
   return (
@@ -133,10 +146,10 @@ function LinkList({ items }: { items: { p: Page; label: string; meta?: string }[
   )
 }
 
-function ComboSection({ hw, m }: { hw: Hw; m: Model }) {
-  const { q, c } = est(hw, m)
-  const rows = quantsFor(m).map(qq => ({ q: qq, c: calc(hw, m, qq, CTX) }))
-  const others = HW.filter(h => h.id !== hw.id).map(h => ({ h, ...est(h, m) }))
+function ComboSection({ hw, m, o }: { hw: Hw; m: Model; o: Opts }) {
+  const { q, c } = est(hw, m, o)
+  const rows = quantsFor(m).map(qq => ({ q: qq, c: calc(hw, m, qq, CTX, 1, o) }))
+  const others = HW.filter(h => h.id !== hw.id).map(h => ({ h, ...est(h, m, o) }))
     .sort((a, b) => (runs(b.c) ? b.c.base : -1) - (runs(a.c) ? a.c.base : -1))
   const fitText = c.fit === 'fits' ? 'fits entirely in memory'
     : c.fit === 'partial' ? 'only fits with part of the model offloaded to system RAM, which slows it down'
@@ -158,14 +171,14 @@ function ComboSection({ hw, m }: { hw: Hw; m: Model }) {
       <h3>{m.name} on other hardware</h3>
       <LinkList items={others.map(o => ({ p: { kind: 'combo', hw: o.h, m }, label: o.h.name, meta: runs(o.c) ? `${fmt(o.c.base)} tok/s at ${o.q.label}` : "won't run" }))} />
       <h3>Other models on the {hw.name}</h3>
-      <LinkList items={MODELS.filter(x => x.id !== m.id).map(x => { const e = est(hw, x); return { p: { kind: 'combo', hw, m: x }, label: x.name, meta: runs(e.c) ? `${fmt(e.c.base)} tok/s at ${e.q.label}` : "won't run" } })} />
+      <LinkList items={MODELS.filter(x => x.id !== m.id).map(x => { const e = est(hw, x, o); return { p: { kind: 'combo', hw, m: x }, label: x.name, meta: runs(e.c) ? `${fmt(e.c.base)} tok/s at ${e.q.label}` : "won't run" } })} />
       <p class="seo-more"><A p={{ kind: 'hw', hw }}>All models on the {hw.name}</A> · <A p={{ kind: 'model', m }}>{m.name} on all hardware</A></p>
     </>
   )
 }
 
-function HwSection({ hw }: { hw: Hw }) {
-  const rows = MODELS.map(m => ({ m, ...est(hw, m) }))
+function HwSection({ hw, o }: { hw: Hw; o: Opts }) {
+  const rows = MODELS.map(m => ({ m, ...est(hw, m, o) }))
   return (
     <>
       <h2>Local LLM speed on the {hw.name}</h2>
@@ -182,8 +195,8 @@ function HwSection({ hw }: { hw: Hw }) {
   )
 }
 
-function ModelSection({ m }: { m: Model }) {
-  const rows = HW.map(hw => ({ hw, ...est(hw, m) }))
+function ModelSection({ m, o }: { m: Model; o: Opts }) {
+  const rows = HW.map(hw => ({ hw, ...est(hw, m, o) }))
     .sort((a, b) => (runs(b.c) ? b.c.base : -1) - (runs(a.c) ? a.c.base : -1))
   return (
     <>
@@ -213,24 +226,26 @@ function HomeSection() {
   )
 }
 
-export function SeoSection({ page }: { page: Page }) {
+export function SeoSection({ page, opts = DEFAULT_OPTS }: { page: Page; opts?: Opts }) {
   return (
+    <SettingsQuery.Provider value={settingsQuery(opts)}>
     <section id="fit" class="seo page-col">
-      {page.kind === 'combo' ? <ComboSection hw={page.hw} m={page.m} />
-        : page.kind === 'hw' ? <HwSection hw={page.hw} />
-        : page.kind === 'model' ? <ModelSection m={page.m} />
+      {page.kind === 'combo' ? <ComboSection hw={page.hw} m={page.m} o={opts} />
+        : page.kind === 'hw' ? <HwSection hw={page.hw} o={opts} />
+        : page.kind === 'model' ? <ModelSection m={page.m} o={opts} />
         : page.kind === 'guide' ? <GuideSection />
         : <HomeSection />}
-      <p class="seo-foot">Estimates for a short prompt on a single device. Measured numbers come from community benchmarks (r/LocalLLaMA, localscore.ai and more); others are derived from similar setups or projected from specs. <a href="https://github.com/nicorobinreal/llmspeed">Open source on GitHub</a>.</p>
+      <p class="seo-foot">Estimates for a short prompt on a single device{opts.kvq !== 'f16' || opts.macRaised ? `, with ${[opts.kvq !== 'f16' && `a ${opts.kvq.toUpperCase()} context cache`, opts.macRaised && 'the Mac GPU memory limit raised'].filter(Boolean).join(' and ')}` : ''}. Measured numbers come from community benchmarks (r/LocalLLaMA, localscore.ai and more); others are derived from similar setups or projected from specs. <a href="https://github.com/nicorobinreal/llmspeed">Open source on GitHub</a>.</p>
     </section>
+    </SettingsQuery.Provider>
   )
 }
 
 /** initial simulator config for a landing page; null keeps the app default */
-export function pageCfg(p: Page, def: { hw: string; model: string; quant: string }) {
+export function pageCfg(p: Page, def: { hw: string; model: string; quant: string }, o: Opts = DEFAULT_OPTS) {
   if (p.kind === 'home' || p.kind === 'guide') return null
   // model pages open on the most popular hardware that fits the model
-  const hw = p.kind === 'model' ? (HW.find(h => est(h, p.m).c.fit === 'fits') ?? HW.find(h => h.id === def.hw)!) : p.hw
+  const hw = p.kind === 'model' ? (HW.find(h => est(h, p.m, o).c.fit === 'fits') ?? HW.find(h => h.id === def.hw)!) : p.hw
   const m = p.kind === 'hw' ? MODELS.find(x => x.id === def.model)! : p.m
-  return { hw: hw.id, model: m.id, quant: pickQuant(hw, m).id }
+  return { hw: hw.id, model: m.id, quant: pickQuant(hw, m, o).id }
 }
