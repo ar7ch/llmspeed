@@ -106,6 +106,8 @@ export interface Bench {
   unit: string
   url: string
   note: string
+  /** 'elo' scores cluster far from zero, so the chart's axis starts near the lowest one */
+  axis?: 'elo'
 }
 
 /** published scores per model id; `_note` says which variant or mode the scores belong to */
