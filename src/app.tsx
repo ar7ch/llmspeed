@@ -4,7 +4,7 @@ import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ } 
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
 import { BenchChart, fmtScore, rankModels } from './bench'
-import { AGENT_CTX, quantNote, workloads } from './guide'
+import { quantNote, workloads } from './guide'
 
 // Design knobs — values match the mockup's exported defaults (Tokens Simulator v3).
 const CONFIG = {
@@ -602,7 +602,7 @@ export class App extends Component<{}, St> {
         ttft: c.fit === 'no' ? '—' : (c.ttft < 10 ? c.ttft.toFixed(2).replace(/0$/, '') : String(Math.round(c.ttft))) + ' s',
         confLabel: conf[0], confDotStyle: `width:8px; height:8px; border-radius:50%; background:${conf[1]}; display:inline-block`,
         showTips: i === 0 && !compare,
-        workloads: !compare && c.fit !== 'no' ? workloads(c, calc(r._hw, r._m, r._q, AGENT_CTX, c.n, c.kvq), r._m.context_max) : [],
+        workloads: !compare && c.fit !== 'no' ? workloads(c, x => calc(r._hw, r._m, r._q, x, c.n, c.kvq), r._m.context_max) : [],
       }
     })
     const mkRows = (r: ReturnType<App['cfgRow']>) => {

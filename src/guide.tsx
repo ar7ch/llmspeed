@@ -20,37 +20,33 @@ export interface Verdict { label: string; head: string; detail: string; good: bo
 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1)
 
-/** the memory sum behind a 256K "won't fit", plus the longest context that does fit */
-function noFit(a: CalcResult): string {
-  const gb = (x: number) => `${x.toFixed(1)} GB`
-  const r1 = (x: number) => Math.round(x * 10) / 10
-  // NOTE: the total is the sum of the rounded parts, so the shown sum adds up
-  const sum = `weights ${gb(a.w)} + 256K ${a.kvq.toUpperCase()} cache ${gb(a.kv)} + runtime ${gb(RUNTIME_GB)} = ${gb(r1(a.w) + r1(a.kv) + RUNTIME_GB)}, over the ${gb(a.usable)} usable`
-  const room = a.usable - a.w - RUNTIME_GB
-  // NOTE: KV grows linearly with context, so the room left after weights sets the longest context
-  const maxK = Math.floor(room / a.kv * (AGENT_CTX / 1024))
-  // calc() keeps at least 0.15 GB of cache at any context
-  return `${sum}; ${room < 0.15 ? 'weights and runtime leave no room for context' : `fits up to ${maxK}K context`}`
-}
+const ctxK = (t: number) => t >= 1048576 ? `${+(t / 1048576).toFixed(1)}M` : `${Math.round(t / 1024)}K`
 
-/** verdicts per workload for an estimate that runs. `agent` is the same setup estimated at an
- *  AGENT_CTX-token prompt (its prefill rate and memory fit) */
-export function workloads(c: CalcResult, agent: CalcResult, contextMax: number): Verdict[] {
+/** verdicts per workload for an estimate that runs. `at` estimates the same setup at another
+ *  context length; agentic coding is judged at the longest context the setup holds, up to AGENT_CTX */
+export function workloads(c: CalcResult, at: (ctx: number) => CalcResult, contextMax: number): Verdict[] {
   const t = c.base
-  const agentOk = contextMax >= AGENT_CTX && agent.fit === 'fits'
   const think = THINK_TOKENS / t
+  const full = at(AGENT_CTX)
+  const room = full.usable - full.w - RUNTIME_GB
+  // NOTE: KV grows linearly with context, so the room left after weights sets the longest context;
+  // calc() keeps at least 0.15 GB of cache at any context
+  const memMax = room < 0.15 ? 0 : Math.floor(room / full.kv * AGENT_CTX / 1024) * 1024
+  const maxCtx = Math.min(contextMax, memMax)
+  const depth = Math.min(maxCtx, AGENT_CTX)
+  const agent = depth > 0 ? at(depth) : null
   return [
     { label: 'Chat', head: cap(band(t, [5, 10, 20, 40], ['slower than you read', 'reading speed', 'comfortable', 'snappy', 'faster than you read'])),
       detail: `${fmt(t)} tok/s; you read about ${READING_TPS}`, good: t >= 10 },
     { label: 'Coding help', head: cap(band(t, [5, 10, 20, 40], ['unusable', 'sluggish', 'usable', 'good', 'great'])),
       detail: `writes a 300-line file (~3K tokens) in ${secs(3000 / t)}`, good: t >= 10 },
-    { label: 'Agentic coding',
-      head: contextMax < AGENT_CTX || agent.fit !== 'fits' ? 'Won\'t fit' : cap(band(agent.base, [10, 20, 40, 80], ['too slow', 'slow', 'workable', 'good', 'great'])),
-      detail: contextMax < AGENT_CTX ? `context tops out at ${Math.round(contextMax / 1024)}K; agents need 256K`
-        : agent.fit !== 'fits' ? noFit(agent)
-        : `${fmt(agent.base)} tok/s at 256K deep; first full read ${secs(agent.ttft)}, cached turns after`,
-      // the first 256K read is a one-time cost; cached turns run at decode speed, so that decides
-      good: agentOk && agent.base >= 20 },
+    agent
+      ? { label: 'Agentic coding', head: cap(band(agent.base, [10, 20, 40, 80], ['too slow', 'slow', 'workable', 'good', 'great'])),
+          detail: `${ctxK(maxCtx)} max context${maxCtx < AGENT_CTX ? ' (256K recommended)' : ''}; ${fmt(agent.base)} tok/s at ${ctxK(depth)}, first read ${secs(agent.ttft)}`,
+          // the first full read is a one-time cost; cached turns run at decode speed, so that decides
+          good: maxCtx >= AGENT_CTX && agent.base >= 20 }
+      : { label: 'Agentic coding', head: 'Won\'t fit', good: false,
+          detail: 'no memory left for context after the weights' },
     { label: 'Reasoning', head: think < 30 ? 'Quick' : think < 90 ? 'Noticeable wait' : 'Long wait',
       detail: `a ${THINK_TOKENS / 1000}K-token hidden think takes ${secs(think)}`, good: think < 30 },
   ]
@@ -115,7 +111,7 @@ export function GuideSection() {
         Two workloads are bound by prompt processing (prefill), not generation. <strong>Agentic coding</strong> re-sends
         a large context on every turn, and a real repository plus tool output needs at least 256K tokens of it.
         The first full read of 256K takes minutes even on fast GPUs (an RTX PRO 6000 prefills about 640 tok/s at that depth, and generation drops
-        from about 200 to 38 tok/s), so prompt caching decides how long later steps wait. Models capped at 128K context don't make the cut.
+        from about 200 to 38 tok/s), so prompt caching decides how long later steps wait. Below 256K, agents have to compact or drop history more often.
         <strong> Document summarization and RAG</strong> wait roughly prompt tokens ÷ prefill speed before the first word.
         Macs and Strix Halo generate well for their price but prefill slowly; discrete NVIDIA cards prefill several times faster.
         <strong> Reasoning models</strong> think in hidden tokens first, so their thinking time acts like extra wait before the answer.
