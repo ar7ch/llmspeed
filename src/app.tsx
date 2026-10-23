@@ -3,7 +3,7 @@ import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedL
 import { calc, fmt, type CalcResult, type Fit } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
-import { BenchChart, fmtScore } from './bench'
+import { BenchChart, fmtScore, rankModels } from './bench'
 import { AGENT_CTX, quantNote, workloads } from './guide'
 
 // Design knobs — values match the mockup's exported defaults (Tokens Simulator v3).
@@ -38,12 +38,14 @@ interface LaneSt { phase: 'norun' | 'prefill' | 'stream' | 'done'; prefillT: num
 interface St {
   cfgs: Cfg[]; preset: number; custom: string | null; phase: 'idle' | 'running' | 'done'
   streamText: string; liveTok: number; prefillT: number; breakdownOpen: boolean; history: Msg[]
-  dd: string | null; tip: string | null; hwSort: 'pop' | 'ram'; modelSort: 'pop' | 'params' | 'size' | 'date' | 'speed' | 'score'
+  dd: string | null; tip: string | null; hwSort: 'pop' | 'ram'; modelSort: 'best' | 'pop' | 'params' | 'size' | 'date' | 'speed' | 'score'
   /** benchmark shown in the quality chart and used by the model dropdown's Score sort */
   bench: string
   /** model and hardware dropdown search text */
   modelQ: string
   hwQ: string
+  /** minimum tok/s for the best-pick ranking, shared by the chart card and the model picker */
+  floor: number
   lanes: LaneSt[]; racePrompt: string; shared: boolean; dark: boolean
   feelPhase: 'type' | 'hold' | 'erase'; feelN: number; feelT: number
   isMobile: boolean; cfgOpen: boolean; composerH: number
@@ -57,7 +59,10 @@ interface RunLane { hw: Hw; m: Model; q: Quant; c: CalcResult; norun: boolean; a
 
 type OptRow =
   | { hdr: true; label: string; hdrStyle: string; dotStyle: string }
-  | { hdr: false; name: string; meta: string; sel: boolean; pick: () => void; style: string }
+  | { hdr: false; name: string; meta: string; sel: boolean; pick: () => void; style: string; mark?: Mark }
+
+/** rank marker in the model picker: a #1-#3 badge, or a dot for the tier below */
+interface Mark { text: string; tip: string; style: string }
 
 const EMPTY_LANE: LaneSt = { phase: 'prefill', prefillT: 0, text: '', liveTok: 0, finishT: 0, winner: false }
 
@@ -66,7 +71,7 @@ export class App extends Component<{}, St> {
     const base: St = {
       cfgs: [{ hw: 'rtx-4090', model: 'llama-3.1-8b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
       streamText: '', liveTok: 0, prefillT: 0, breakdownOpen: false, history: [],
-      dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
+      dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', floor: 10, bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
       // index.html picks the theme before first paint (saved choice, else system setting)
       dark: typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'),
       feelPhase: 'type', feelN: 0, feelT: 0,
@@ -178,7 +183,7 @@ export class App extends Component<{}, St> {
       ref={(el: HTMLInputElement | null) => { if (el && !el.dataset.f) { el.dataset.f = '1'; el.focus() } }}
       style="margin:0 4px 8px; padding:7px 11px; font:inherit; font-size:13px; color:var(--c-text); background:var(--c-bg-subtle); border:1px solid var(--c-border); border-radius:9px; outline:none" />
   }
-  groupOpts<T>(sorted: T[], fitOf: (x: T) => Fit, mapFn: (x: T) => { name: string; meta: string; sel: boolean; pick: () => void }): OptRow[] {
+  groupOpts<T>(sorted: T[], fitOf: (x: T) => Fit, mapFn: (x: T) => { name: string; meta: string; sel: boolean; pick: () => void; mark?: Mark }): OptRow[] {
     const groups: Record<Fit, T[]> = { fits: [], partial: [], no: [] }
     sorted.forEach(x => groups[fitOf(x)].push(x))
     const meta: Record<Fit, [string, string]> = { fits: ['Runs comfortably', 'oklch(0.55 0.15 155)'], partial: ['Partial offload · slow', 'oklch(0.68 0.13 85)'], no: ["Won't run", 'oklch(0.55 0.19 25)'] }
@@ -469,10 +474,29 @@ export class App extends Component<{}, St> {
     const fitLabels: Record<Fit, string> = { fits: `Fits in ${c.usable.toFixed(0)} GB`, partial: 'Partial offload', no: "Won't run" }
     const fc = fitColors[c.fit]
     void fc
-    // weight file size at the selected quant, or the model's smallest when it lacks that quant
-    const weightsGb = (mm: Model) => (mm.quants[q.id] ?? mm.quants[quantsFor(mm)[0].id]).file_gb
-    // the dropdown's estimate for a model: the selected quant if it has it, else its smallest
-    const mcalc = (mm: Model) => calc(hw, mm, quantOf(mm.quants[q.id] ? q.id : quantsFor(mm)[0].id), ctx, n)
+    // rank markers: the best-pick ranking for this setup and the chart's benchmark
+    const bench = BENCHES.find(b => b.id === s.bench)
+    const ranked = bench ? rankModels(hw, n, ctx, bench, s.floor) : []
+    const okRanked = ranked.filter(x => x.ok).sort((x, y) => y.adj - x.adj)
+    const rankedOf = (mm: Model) => ranked.find(r => r.m.id === mm.id)
+    // per-row estimates use the ranked quant when the model has one (that's what picking it
+    // loads), else the selected quant, else the model's smallest
+    const rowQuant = (mm: Model) => rankedOf(mm)?.q.id ?? (mm.quants[q.id] ? q.id : quantsFor(mm)[0].id)
+    const weightsGb = (mm: Model) => mm.quants[rowQuant(mm)].file_gb
+    const markOf = (mm: Model): Mark | undefined => {
+      const x = rankedOf(mm)
+      if (!x || !bench) return undefined
+      const at = `${fmtScore(x.s)} on ${bench.short} · ${x.q.label} · ${fmt(x.c.base)} tok/s`
+      if (!x.ok) return { text: '', tip: `Fits, but under ${s.floor} tok/s · ${at}`, style: 'width:8px; height:8px; border-radius:50%; border:1.5px solid var(--c-border-strong)' }
+      const i = okRanked.indexOf(x)
+      if (i < 3) return { text: `#${i + 1}`, tip: `Best pick #${i + 1} for this setup · ${at}`, style: 'font-size:10px; font-weight:700; color:#fff; background:oklch(0.62 0.17 30); border-radius:99px; padding:2px 5px; line-height:1' }
+      const top = i < Math.ceil(okRanked.length / 3)
+      return { text: '', tip: `${top ? 'Top third' : 'Lower ranked'} for this setup · ${at}`, style: `width:8px; height:8px; border-radius:50%; background:${top ? 'oklch(0.55 0.15 155)' : 'oklch(0.68 0.13 75)'}` }
+    }
+    // Best sort: models that meet the floor by adjusted score, then the too-slow ones, then the rest
+    const rankKey = (mm: Model) => { const x = rankedOf(mm); return x ? (x.ok ? 2e6 : 1e6) + x.adj : 0 }
+    // the dropdown's estimate for a model, at rowQuant
+    const mcalc = (mm: Model) => rankedOf(mm)?.c ?? calc(hw, mm, quantOf(rowQuant(mm)), ctx, n)
     const score = (mm: Model) => scoresOf(mm.id)[s.bench] as number | undefined
     const sortBtn = (act: boolean) => `border-radius:99px; padding:3px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap; ${act ? 'background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)' : 'background:none; border:1px solid var(--c-border); color:var(--c-text-muted)'}`
     return {
@@ -485,6 +509,7 @@ export class App extends Component<{}, St> {
       setHwQ: (e: Event) => this.setState({ hwQ: (e.target as HTMLInputElement).value }),
       toggleModelDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('model') ? null : dd('model'), modelQ: '' })) },
       modelQ: s.modelQ,
+      rankBench: BENCHES.find(b => b.id === s.bench)?.short ?? '', rankFloor: s.floor,
       setModelQ: (e: Event) => this.setState({ modelQ: (e.target as HTMLInputElement).value }),
       toggleQuantDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('quant') ? null : dd('quant'), tip: null })) },
       hwSortBtns: ([['pop', 'Popular'], ['ram', 'RAM']] as ['pop' | 'ram', string][]).map(([id, label]) => ({
@@ -498,7 +523,7 @@ export class App extends Component<{}, St> {
         style: sortBtn(n === k),
       })),
       linkLabel: linkFor(hw).label,
-      modelSortBtns: ([['pop', 'Popular'], ['params', 'Params'], ['size', 'Weights'], ['date', 'Newest'], ['speed', 'Speed'], ['score', BENCHES.find(b => b.id === s.bench)?.short ?? 'Score']] as [St['modelSort'], string][]).map(([id, label]) => ({
+      modelSortBtns: ([['best', 'Best'], ['pop', 'Popular'], ['params', 'Params'], ['size', 'Weights'], ['date', 'Newest'], ['speed', 'Speed'], ['score', BENCHES.find(b => b.id === s.bench)?.short ?? 'Score']] as [St['modelSort'], string][]).map(([id, label]) => ({
         label,
         pick: (e: Event) => { e.stopPropagation(); this.setState({ modelSort: id }) },
         style: sortBtn(s.modelSort === id),
@@ -508,15 +533,17 @@ export class App extends Component<{}, St> {
         h => calc(h, m, q, ctx, clampNodes(h, n)).fit,
         h => ({ name: h.name, meta: `${h.vram_gb} GB${h.status === 'announced' ? ' · announced' : ''}`, sel: h.id === cfg.hw, pick: () => setCfg({ hw: h.id }) })),
       modelOpts: this.groupOpts(
-        MODELS.filter(mm => App.matches(s.modelQ, `${mm.name} ${mm.id}`)).sort((a, b) => (s.modelSort === 'params' ? b.total_params_b - a.total_params_b
+        MODELS.filter(mm => App.matches(s.modelQ, `${mm.name} ${mm.id}`)).sort((a, b) => (s.modelSort === 'best' ? rankKey(b) - rankKey(a)
+          : s.modelSort === 'params' ? b.total_params_b - a.total_params_b
           : s.modelSort === 'size' ? weightsGb(b) - weightsGb(a)
           : s.modelSort === 'date' ? releasedOf(b.id).localeCompare(releasedOf(a.id))
           : s.modelSort === 'speed' ? mcalc(b).base - mcalc(a).base
           : s.modelSort === 'score' ? (score(b) ?? -1) - (score(a) ?? -1) : 0) || a.popularity_rank - b.popularity_rank),
+        // ranked models are judged at their ranked quant, which is also what picking them loads
         mm => mcalc(mm).fit,
         mm => ({ name: mm.name, meta: [s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
           : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
-          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, releasedLabel(mm.id)].filter(Boolean).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg({ model: mm.id }) })),
+          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, releasedLabel(mm.id)].filter(Boolean).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
       quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n).fit })).map(({ qq, fit }) => ({
         name: qq.label, meta: [quantNote(qq.id, m.total_params_b), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
         fitColor: fit === 'no' ? fitColors.no : fit === 'partial' ? fitColors.partial : '',
@@ -861,7 +888,7 @@ export class App extends Component<{}, St> {
         </div>
         {v.heroMode && (() => {
           const { hw, n } = this.resolve(this.state.cfgs[0])
-          return <BenchChart hw={hw} n={n} bench={this.state.bench} setBench={b => this.setState({ bench: b })} ctx={this.promptTokens()} model={this.state.cfgs[0].model}
+          return <BenchChart hw={hw} n={n} bench={this.state.bench} setBench={b => this.setState({ bench: b })} floor={this.state.floor} setFloor={f => this.setState({ floor: f })} ctx={this.promptTokens()} model={this.state.cfgs[0].model}
             setHw={(h, n) => this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, hw: h.id, n } : c) }))}
             pick={(m, q) => { this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, model: m.id, quant: q.id } : c) })); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
         })()}
@@ -1028,11 +1055,18 @@ export class App extends Component<{}, St> {
                         {r.modelSortBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
                       </div>
                       {this.searchInput('models', r.modelQ, r.setModelQ)}
+                      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:0 8px 8px; font-size:11px; color:var(--c-text-faint)">
+                        <span>Ranked by {r.rankBench} at {r.rankFloor}+ tok/s:</span>
+                        <span style="display:inline-flex; align-items:center; gap:4px"><span style="font-size:9.5px; font-weight:700; color:#fff; background:oklch(0.62 0.17 30); border-radius:99px; padding:1px 4px">#1</span>best</span>
+                        <span style="display:inline-flex; align-items:center; gap:4px"><span style="width:7px; height:7px; border-radius:50%; background:oklch(0.55 0.15 155)"></span>top third</span>
+                        <span style="display:inline-flex; align-items:center; gap:4px"><span style="width:7px; height:7px; border-radius:50%; background:oklch(0.68 0.13 75)"></span>lower</span>
+                        <span style="display:inline-flex; align-items:center; gap:4px"><span style="width:7px; height:7px; border-radius:50%; border:1.5px solid var(--c-border-strong)"></span>too slow</span>
+                      </div>
                       <div style="overflow-y:auto; display:flex; flex-direction:column">
                         {r.modelOpts.length === 0 && <div style="padding:10px; font-size:12.5px; color:var(--c-text-muted)">No model matches "{r.modelQ}"</div>}
                         {r.modelOpts.map((o, j) => o.hdr
                           ? <div key={j} style={o.hdrStyle}><span style={o.dotStyle}></span>{o.label}</div>
-                          : <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{o.name}</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint); flex-shrink:0">{o.meta}</span></button>)}
+                          : <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style="display:inline-flex; align-items:center; gap:7px; min-width:0"><span style="width:22px; flex-shrink:0; display:inline-flex; justify-content:center">{o.mark && <span title={o.mark.tip} aria-label={o.mark.tip} style={o.mark.style}>{o.mark.text}</span>}</span><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{o.name}</span></span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint); flex-shrink:0">{o.meta}</span></button>)}
                       </div>
                     </div>
                   )}

@@ -2,7 +2,7 @@
 // that run on the selected setup in the accent color. Scores are for full-precision weights;
 // quantization costs some of it (see the quant notes).
 import { Component } from 'preact'
-import { BENCHES, HW, MODELS, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
+import { BENCHES, HW, MODELS, type Bench, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult } from './calc'
 
 const ACCENT = 'oklch(0.62 0.17 30)'
@@ -18,8 +18,8 @@ const lowBits = (q: Quant) => /iq1/.test(q.id) ? 1 : /q2|iq2/.test(q.id) ? 2 : 0
 /** scores keep their published precision (89.2, not 89) */
 export const fmtScore = (x: number) => x.toFixed(1).replace(/\.0$/, '')
 
-interface Props { hw: Hw; n: number; bench: string; setBench: (id: string) => void; ctx: number; model: string; pick: (m: Model, q: Quant) => void; setHw: (hw: Hw, n: number) => void }
-interface St { sort: 'score' | 'speed'; hover: string | null; floor: number }
+interface Props { hw: Hw; n: number; bench: string; setBench: (id: string) => void; floor: number; setFloor: (f: number) => void; ctx: number; model: string; pick: (m: Model, q: Quant) => void; setHw: (hw: Hw, n: number) => void }
+interface St { sort: 'score' | 'speed'; hover: string | null }
 
 /** the quant to run: the largest Q4 that fits, else the largest that fits, else the smallest */
 function bestRun(hw: Hw, n: number, m: Model, ctx: number): { q: Quant; c: CalcResult } {
@@ -47,12 +47,34 @@ export function quantKeep(q: Quant, m: Model): number {
 const adjust = (s: number, keep: number, b: { axis?: string }) => b.axis === 'elo' ? 1000 + (s - 1000) * keep : s * keep
 
 /** speed floors offered for the best-pick card: reading speed, comfortable chat, agents */
-const FLOORS = [5, 10, 20]
+export const FLOORS = [5, 10, 20]
+
+export interface Ranked { m: Model; s: number; ok: boolean; q: Quant; c: CalcResult; adj: number }
+
+/** Best pick: for each 2026 model with a score on `b`, the quant with the highest quality-adjusted
+ *  score that fits and still runs at the speed floor (`ok`), else the best one that fits at all.
+ *  Quants within 2.5% of the best adjusted score count as equal and the fastest wins, so Q4 beats
+ *  a 2x slower Q8 or FP16. Models that don't fit are left out. */
+export function rankModels(hw: Hw, n: number, ctx: number, b: Bench, floor: number): Ranked[] {
+  return CURRENT.flatMap(m => {
+    const s = scoresOf(m.id)[b.id] as number | undefined
+    if (typeof s !== 'number') return []
+    const opts = quantsFor(m).map(q => ({ q, c: calc(hw, m, q, ctx, n), adj: adjust(s, quantKeep(q, m), b) })).filter(x => x.c.fit === 'fits')
+    const choose = (xs: typeof opts) => {
+      const top = Math.max(...xs.map(x => x.adj))
+      // the window is 2.5% of the score above Elo's 1000 floor (or above 0 for percentages)
+      const floor0 = b.axis === 'elo' ? 1000 : 0
+      return xs.filter(x => x.adj >= top - (top - floor0) * 0.025).sort((x, y) => y.c.base - x.c.base)[0]
+    }
+    const fast = opts.filter(x => x.c.base >= floor)
+    return opts.length ? [{ m, s, ok: fast.length > 0, ...choose(fast.length ? fast : opts) }] : []
+  })
+}
 
 export class BenchChart extends Component<Props, St> {
-  state: St = { sort: 'score', hover: null, floor: 10 }
+  state: St = { sort: 'score', hover: null }
 
-  render({ hw, n, bench, setBench, ctx, model, pick, setHw }: Props, { sort, hover, floor }: St) {
+  render({ hw, n, bench, setBench, floor, setFloor, ctx, model, pick, setHw }: Props, { sort, hover }: St) {
     const b = BENCHES.find(x => x.id === bench)
     if (!b) return null
     const rows = CURRENT.map(m => ({ m, s: scoresOf(m.id)[b.id] as number | undefined, ...bestRun(hw, n, m, ctx) }))
@@ -64,22 +86,7 @@ export class BenchChart extends Component<Props, St> {
     // Elo bars start near the lowest score, otherwise every bar looks the same length
     const axisMin = b.axis === 'elo' ? Math.floor((lo - 60) / 50) * 50 : 0
     const max = b.unit === '%' ? 100 : b.axis === 'elo' ? hi + 20 : hi * 1.1
-    // best pick: for each model the quant with the highest quality-adjusted score that fits and
-    // still runs at the speed floor, then the top three models. Quants within 2.5% of the best
-    // adjusted score count as equal and the fastest wins, so Q4 beats a 2x slower Q8 or FP16.
-    const fitting = CURRENT.flatMap(m => {
-      const s = scoresOf(m.id)[b.id] as number | undefined
-      if (typeof s !== 'number') return []
-      const opts = quantsFor(m).map(q => ({ q, c: calc(hw, m, q, ctx, n), adj: adjust(s, quantKeep(q, m), b) })).filter(x => x.c.fit === 'fits')
-      const choose = (xs: typeof opts) => {
-        const top = Math.max(...xs.map(x => x.adj))
-        // the window is 2.5% of the score above Elo's 1000 floor (or above 0 for percentages)
-        const floor0 = b.axis === 'elo' ? 1000 : 0
-        return xs.filter(x => x.adj >= top - (top - floor0) * 0.025).sort((x, y) => y.c.base - x.c.base)[0]
-      }
-      const fast = opts.filter(x => x.c.base >= floor)
-      return opts.length ? [{ m, s, ok: fast.length > 0, ...choose(fast.length ? fast : opts) }] : []
-    })
+    const fitting = rankModels(hw, n, ctx, b, floor)
     const picks = fitting.filter(x => x.ok).sort((x, y) => y.adj - x.adj).slice(0, 3)
     // the best model that fits but misses the floor, when it would have made the top three
     const slower = fitting.filter(x => !x.ok && (picks.length < 3 || x.adj > picks[picks.length - 1].adj)).sort((x, y) => y.adj - x.adj)[0]
@@ -109,7 +116,7 @@ export class BenchChart extends Component<Props, St> {
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
             <div style="font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:var(--c-text-muted); flex:1; min-width:180px">Best for {setupName(hw, n)} by {b.short}</div>
             <span style="font-size:11px; color:var(--c-text-faint)">At least</span>
-            {FLOORS.map(f => <button key={f} onClick={() => this.setState({ floor: f })} style={tab(floor === f)}>{f} tok/s</button>)}
+            {FLOORS.map(f => <button key={f} onClick={() => setFloor(f)} style={tab(floor === f)}>{f} tok/s</button>)}
           </div>
           {picks.length === 0 ? <div style="font-size:13px; color:var(--c-text-sec); margin-top:8px">No 2026 model with a {b.short} score fits here at {floor}+ tok/s.</div> : picks.map((p, i) => (
             <div key={p.m.id} style={`display:flex; align-items:center; gap:12px; margin-top:${i ? 6 : 10}px`}>
