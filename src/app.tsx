@@ -210,6 +210,8 @@ export class App extends Component<{}, St> {
   }
 
   componentDidMount() {
+    // the hero renders first and can reset the scroll, so land on #fit once the page has laid out
+    if (location.hash === '#fit') requestAnimationFrame(() => document.getElementById('fit')?.scrollIntoView())
     this._doc = () => { if (this.state.dd) this.setState({ dd: null }) }
     document.addEventListener('click', this._doc)
     this._mq = matchMedia('(max-width:640px)')
@@ -1132,37 +1134,37 @@ export class App extends Component<{}, St> {
             ))}
             <div style="display:flex; align-items:center; gap:16px; margin-top:12px; flex-wrap:wrap; min-height:29px">
               {v.statRows.map((st, i) => (
-                <span key={i} style="display:inline-flex; align-items:center; gap:10px">
+                <span key={i} style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap">
                   {st.showBadge && <span style={st.badgeStyle}>{st.badge}</span>}
-                  <span style="display:inline-flex; align-items:center; gap:5px">
-                    <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--c-text-muted)">{st.range} tok/s</span>
+                  <span class="chip" style="gap:6px; padding:4px 6px 4px 10px; font-size:12.5px">
+                    <span style="font-family:'IBM Plex Mono',monospace">{st.range} tok/s</span>
                     {st.showTips && (
                       <span style="position:relative; display:inline-flex">
                         <span onMouseEnter={v.tipTokOn} onMouseLeave={v.tipOff} class="hv-help" style="width:15px; height:15px; border-radius:50%; border:1px solid var(--c-border-strong); color:var(--c-text-faint); font-size:10px; display:inline-flex; align-items:center; justify-content:center; cursor:help">?</span>
                         {v.tipTok && (
-                          <span ref={this._menuRef} style={`position:absolute; ${v.tipAnchorStat}; left:50%; transform:translateX(-50%); width:min(240px, calc(100vw - 48px)); background:var(--c-ink); color:var(--c-bg-muted); font-size:12px; line-height:1.5; padding:9px 12px; border-radius:10px; z-index:20; pointer-events:none`}>{v.tokHelp}</span>
+                          <span ref={this._menuRef} style={`position:absolute; ${v.tipAnchorStat}; left:50%; transform:translateX(-50%); white-space:normal; width:min(240px, calc(100vw - 48px)); background:var(--c-ink); color:var(--c-bg-muted); font-size:12px; line-height:1.5; padding:9px 12px; border-radius:10px; z-index:20; pointer-events:none`}>{v.tokHelp}</span>
                         )}
                       </span>
                     )}
                   </span>
-                  <span style="display:inline-flex; align-items:center; gap:5px">
-                    <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--c-text-muted)">TTFT {st.ttft}</span>
+                  <span class="chip" style="gap:6px; padding:4px 6px 4px 10px; font-size:12.5px">
+                    <span style="font-family:'IBM Plex Mono',monospace">TTFT {st.ttft}</span>
                     {st.showTips && (
                       <span style="position:relative; display:inline-flex">
                         <span onMouseEnter={v.tipTtftOn} onMouseLeave={v.tipOff} class="hv-help" style="width:15px; height:15px; border-radius:50%; border:1px solid var(--c-border-strong); color:var(--c-text-faint); font-size:10px; display:inline-flex; align-items:center; justify-content:center; cursor:help">?</span>
                         {v.tipTtft && (
-                          <span ref={this._menuRef} style={`position:absolute; ${v.tipAnchorStat}; left:50%; transform:translateX(-50%); width:min(240px, calc(100vw - 48px)); background:var(--c-ink); color:var(--c-bg-muted); font-size:12px; line-height:1.5; padding:9px 12px; border-radius:10px; z-index:20; pointer-events:none`}>{v.ttftHelp}</span>
+                          <span ref={this._menuRef} style={`position:absolute; ${v.tipAnchorStat}; left:50%; transform:translateX(-50%); white-space:normal; width:min(240px, calc(100vw - 48px)); background:var(--c-ink); color:var(--c-bg-muted); font-size:12px; line-height:1.5; padding:9px 12px; border-radius:10px; z-index:20; pointer-events:none`}>{v.ttftHelp}</span>
                         )}
                       </span>
                     )}
                   </span>
-                  <span style="display:inline-flex; align-items:center; gap:5px">
-                    <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--c-text-muted)"><span style={st.confDotStyle}></span>{st.confLabel}</span>
+                  <span class="chip" style="gap:6px; padding:4px 6px 4px 10px; font-size:12.5px">
+                    <span style="display:inline-flex; align-items:center; gap:6px"><span style={st.confDotStyle}></span>{st.confLabel}</span>
                     {st.showTips && (
                       <span style="position:relative; display:inline-flex">
                         <span onMouseEnter={v.tipConfOn} onMouseLeave={v.tipOff} class="hv-help" style="width:15px; height:15px; border-radius:50%; border:1px solid var(--c-border-strong); color:var(--c-text-faint); font-size:10px; display:inline-flex; align-items:center; justify-content:center; cursor:help">?</span>
                         {v.tipConf && (
-                          <span ref={this._menuRef} style={`position:absolute; ${v.tipAnchorStat}; left:50%; transform:translateX(-50%); width:min(250px, calc(100vw - 48px)); background:var(--c-ink); color:var(--c-bg-muted); font-size:12px; line-height:1.5; padding:9px 12px; border-radius:10px; z-index:20; pointer-events:none`}>{v.confHelp}</span>
+                          <span ref={this._menuRef} style={`position:absolute; ${v.tipAnchorStat}; left:50%; transform:translateX(-50%); white-space:normal; width:min(250px, calc(100vw - 48px)); background:var(--c-ink); color:var(--c-bg-muted); font-size:12px; line-height:1.5; padding:9px 12px; border-radius:10px; z-index:20; pointer-events:none`}>{v.confHelp}</span>
                         )}
                       </span>
                     )}
@@ -1198,8 +1200,8 @@ export class App extends Component<{}, St> {
                 )}
                 <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px">
                   <a href="/guide/" class="pill-link">What these mean</a>
-                  <a href={`/hardware/${v.cfgRows[0]._hw.id}/`} class="pill-link">Every model on this hardware →</a>
-                  <a href={`/models/${v.cfgRows[0]._m.id}/`} class="pill-link">Hardware that runs this model →</a>
+                  <a href={`/hardware/${v.cfgRows[0]._hw.id}/#fit`} class="pill-link">Every model on this hardware →</a>
+                  <a href={`/models/${v.cfgRows[0]._m.id}/#fit`} class="pill-link">Hardware that runs this model →</a>
                 </div>
               </div>
             )}

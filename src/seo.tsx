@@ -215,7 +215,7 @@ function HomeSection() {
 
 export function SeoSection({ page }: { page: Page }) {
   return (
-    <section class="seo page-col">
+    <section id="fit" class="seo page-col">
       {page.kind === 'combo' ? <ComboSection hw={page.hw} m={page.m} />
         : page.kind === 'hw' ? <HwSection hw={page.hw} />
         : page.kind === 'model' ? <ModelSection m={page.m} />
