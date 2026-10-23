@@ -123,6 +123,8 @@ interface AppData {
   cluster_runs?: ClusterRun[]
   benchmarks?: Bench[]
   scores?: Record<string, Scores>
+  /** first open-weights release, YYYY-MM-DD */
+  released?: Record<string, string>
   projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>>
 }
 
@@ -139,6 +141,7 @@ const DATA: AppData = {
   cluster_runs: EXTRA.cluster_runs,
   benchmarks: EXTRA.benchmarks,
   scores: EXTRA.scores,
+  released: EXTRA.released,
   projected_decode_eff: EXTRA.projected_decode_eff,
 }
 
@@ -200,6 +203,7 @@ export const macLimitNote = (hw: Hw, n: number) => hw.vendor !== 'apple' || hw.v
 export const setupName = (hw: Hw, n: number) => n > 1 ? `${n}× ${hw.name}` : hw.name
 
 export const BENCHES: Bench[] = DATA.benchmarks ?? []
+export const releasedOf = (modelId: string) => DATA.released?.[modelId] ?? ''
 export const scoresOf = (modelId: string): Scores => DATA.scores?.[modelId] ?? {}
 
 export const clusterRuns = (hwId: string, modelId: string) =>

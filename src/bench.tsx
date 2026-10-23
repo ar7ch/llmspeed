@@ -2,10 +2,14 @@
 // that run on the selected setup in the accent color. Scores are for full-precision weights;
 // quantization costs some of it (see the quant notes).
 import { Component } from 'preact'
-import { BENCHES, HW, MODELS, macLimitNote, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
+import { BENCHES, HW, MODELS, macLimitNote, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult } from './calc'
 
 const ACCENT = 'oklch(0.62 0.17 30)'
+
+// only models and benchmark editions from 2026 on; older ones compare poorly with current ones
+const SINCE = '2026-01-01'
+const CURRENT = MODELS.filter(m => releasedOf(m.id) >= SINCE)
 
 /** 1- or 2-bit quants: these lose real quality, so a published full-precision score overstates them */
 const lowBits = (q: Quant) => /iq1/.test(q.id) ? 1 : /q2|iq2/.test(q.id) ? 2 : 0
@@ -30,7 +34,7 @@ export class BenchChart extends Component<Props, St> {
   render({ hw, n, bench, setBench, ctx, model, pick, setHw }: Props, { sort, hover }: St) {
     const b = BENCHES.find(x => x.id === bench)
     if (!b) return null
-    const rows = MODELS.map(m => ({ m, s: scoresOf(m.id)[b.id] as number | undefined, ...bestRun(hw, n, m, ctx) }))
+    const rows = CURRENT.map(m => ({ m, s: scoresOf(m.id)[b.id] as number | undefined, ...bestRun(hw, n, m, ctx) }))
     // speed sort: runnable models by tok/s, then the ones that don't fit, by score
     const tps = (r: { c: CalcResult }) => r.c.fit === 'no' ? -1 : r.c.base
     const scored = rows.filter(r => typeof r.s === 'number').sort((x, y) => (sort === 'speed' ? tps(y) - tps(x) : 0) || y.s! - x.s!)
@@ -93,6 +97,7 @@ export class BenchChart extends Component<Props, St> {
           const more = scored.filter(r => r.c.fit === 'no' && quantsFor(r.m).some(q => calc(hw, r.m, q, ctx, n).total <= macRaisedUsable(hw, n))).length
           return <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">{macLimitNote(hw, n)}{more > 0 && ` That would let ${more} more model${more > 1 ? 's' : ''} here fit.`}</p>
         })()}
+        <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Showing models and benchmark editions released in 2026; {MODELS.length - CURRENT.length} older models are hidden.</p>
         <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Scores are vendor-reported or from Artificial Analysis, at full precision. Quantization lowers them a little at Q4 and a lot below Q3 on small models.</p>
       </section>
     )

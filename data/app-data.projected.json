@@ -1364,240 +1364,229 @@
  ],
  "benchmarks": [
   {
-   "id": "gpqa_diamond",
-   "name": "GPQA Diamond",
-   "short": "GPQA",
+   "id": "tb21",
+   "name": "Terminal-Bench 2.1",
+   "short": "TB 2.1",
    "unit": "%",
-   "url": "https://arxiv.org/abs/2311.12022",
-   "note": "Graduate-level science questions."
-  },
-  {
-   "id": "swe_bench_verified",
-   "name": "SWE-bench Verified",
-   "short": "SWE-bench",
-   "unit": "%",
-   "url": "https://www.swebench.com",
-   "note": "Resolving real GitHub issues. Model-card values; agent scaffolds differ between vendors, so treat gaps under ~5 points as noise."
-  },
-  {
-   "id": "terminal_bench_2",
-   "name": "Terminal-Bench 2.0",
-   "short": "Terminal-Bench",
-   "unit": "%",
-   "url": "https://www.tbench.ai",
-   "note": "Agentic tasks in a terminal. Version 2.0 only; many 2026 cards report 2.1+, which isn't comparable."
-  },
-  {
-   "id": "livecodebench",
-   "name": "LiveCodeBench",
-   "short": "LiveCodeBench",
-   "unit": "%",
-   "url": "https://livecodebench.github.io",
-   "note": "Fresh competitive-programming problems. Mostly v6; Magistral is v5."
-  },
-  {
-   "id": "aider_polyglot",
-   "name": "Aider Polyglot",
-   "short": "Aider",
-   "unit": "%",
-   "url": "https://aider.chat/docs/leaderboards/",
-   "note": "Code edits across six languages."
-  },
-  {
-   "id": "aime_2025",
-   "name": "AIME 2025",
-   "short": "AIME 25",
-   "unit": "%",
-   "url": "https://artofproblemsolving.com/wiki/index.php/2025_AIME_I",
-   "note": "Competition math, no tools."
-  },
-  {
-   "id": "mmlu_pro",
-   "name": "MMLU-Pro",
-   "short": "MMLU-Pro",
-   "unit": "%",
-   "url": "https://arxiv.org/abs/2406.01574",
-   "note": "Broad knowledge, 10-choice questions."
-  },
-  {
-   "id": "hle",
-   "name": "Humanity's Last Exam",
-   "short": "HLE",
-   "unit": "%",
-   "url": "https://lastexam.ai",
-   "note": "Expert-level questions, no tools."
+   "released": "2026-05-06",
+   "url": "https://www.tbench.ai/news/terminal-bench-2-1",
+   "note": "Agentic tasks in a terminal (89 tasks). Harnesses differ (Claude Code, Terminus, AA's own) and move scores by 5-7 points."
   },
   {
    "id": "aa_index",
-   "name": "AA Intelligence Index",
+   "name": "Artificial Analysis Intelligence Index v4.3",
    "short": "AA Index",
    "unit": "",
-   "url": "https://artificialanalysis.ai",
-   "note": "Artificial Analysis Intelligence Index v4.3.2, a composite of reasoning, knowledge, math and coding evals. This version compresses the scale, and some values are AA's own estimates, so small gaps (and a few rankings, like Kimi K2.6 under Qwen 27B) say little."
+   "released": "2026-09-07",
+   "url": "https://artificialanalysis.ai/articles/artificial-analysis-intelligence-index-v4-3",
+   "note": "Composite of 10 evals (Terminal-Bench 4.0, HLE, GDPval-AA, SciCode and others), 0-100. AA marks some older models' values as estimates."
+  },
+  {
+   "id": "aime26",
+   "name": "AIME 2026",
+   "short": "AIME 26",
+   "unit": "%",
+   "released": "2026-02-05",
+   "url": "https://matharena.ai/?comp=aime--aime_2026",
+   "note": "30 competition math problems, no tools. Near-saturated for reasoning models."
+  },
+  {
+   "id": "tau3_banking",
+   "name": "\u03c4\u00b3-bench Banking",
+   "short": "\u03c4\u00b3 Banking",
+   "unit": "%",
+   "released": "2026-03-18",
+   "url": "https://github.com/sierra-research/tau2-bench/releases",
+   "note": "Tool-using customer-service agent with retrieval over 698 bank policy docs. AA and NVIDIA run the banking domain only."
+  },
+  {
+   "id": "deepswe_v11",
+   "name": "DeepSWE v1.1",
+   "short": "DeepSWE",
+   "unit": "%",
+   "released": "2026-06-14",
+   "url": "https://deepswe.datacurve.ai/blog/deepswe-v1-1",
+   "note": "113 long-horizon software tasks across 91 repos, pass@1 with mini-swe-agent. Epoch rates v1.1 as flawed (grading false negatives on 23+ tasks)."
   }
  ],
  "scores": {
   "qwen3.6-27b": {
-   "livecodebench": 90.3,
-   "gpqa_diamond": 89.2,
-   "hle": 30.8,
-   "aa_index": 34,
-   "_note": "Qwen3.8-27B, thinking"
+   "tb21": 73.0,
+   "deepswe_v11": 42.2,
+   "tau3_banking": 48.0,
+   "aa_index": 33.7,
+   "_note": "Qwen3.8-27B, thinking. Qwen3.6-27B scores lower: TB 2.1 60.7, AIME 26 94.1, AA 21.4"
   },
   "qwen3.8-flash-next": {
-   "livecodebench": 91.9,
-   "gpqa_diamond": 91.7,
-   "hle": 35.9,
-   "aa_index": 40,
+   "deepswe_v11": 58.7,
+   "tb21": 86.1,
+   "tau3_banking": 45.4,
+   "aa_index": 39.8,
    "_note": "thinking"
   },
   "glm-5.3-flash": {
-   "aa_index": 42,
-   "_note": "thinking (max)"
+   "tb21": 84.3,
+   "deepswe_v11": 63.4,
+   "tau3_banking": 47.2,
+   "aa_index": 41.8,
+   "_note": "reasoning effort max"
   },
   "gemma-4-26b-a4b": {
-   "livecodebench": 77.1,
-   "gpqa_diamond": 82.3,
-   "mmlu_pro": 82.6,
-   "hle": 8.7,
-   "aa_index": 17
+   "aime26": 88.3,
+   "tb21": 39.0,
+   "tau3_banking": 12.0,
+   "aa_index": 16.7,
+   "_note": "AA index is an AA estimate"
   },
   "gpt-oss-20b": {
-   "swe_bench_verified": 60.7,
-   "terminal_bench_2": 3.1,
-   "livecodebench": 77.7,
-   "aider_polyglot": 34.2,
-   "gpqa_diamond": 71.5,
-   "aime_2025": 91.7,
-   "hle": 10.9,
-   "aa_index": 9,
-   "_note": "reasoning high; TB2 from NVIDIA (arXiv 2602.21193)"
+   "tb21": 13.9,
+   "tau3_banking": 7.0,
+   "aa_index": 9.0,
+   "_note": "reasoning high"
   },
   "qwen3.6-35b-a3b": {
-   "swe_bench_verified": 73.4,
-   "terminal_bench_2": 51.5,
-   "livecodebench": 80.4,
-   "gpqa_diamond": 86.0,
-   "mmlu_pro": 85.2,
-   "hle": 21.4,
-   "aa_index": 18,
-   "_note": "Qwen3.6-35B-A3B, thinking"
+   "aime26": 92.7,
+   "tb21": 44.9,
+   "tau3_banking": 9.3,
+   "aa_index": 18.2,
+   "_note": "thinking"
   },
   "gemma-4-31b": {
-   "livecodebench": 80.0,
-   "gpqa_diamond": 84.3,
-   "mmlu_pro": 85.2,
-   "hle": 19.5,
-   "aa_index": 15
+   "aime26": 89.2,
+   "tb21": 43.4,
+   "tau3_banking": 14.8,
+   "aa_index": 14.7
   },
   "qwen3.5-9b": {
-   "livecodebench": 65.6,
-   "gpqa_diamond": 81.7,
-   "mmlu_pro": 82.5,
-   "aa_index": 11,
+   "aime26": 92.5,
+   "tb21": 29.2,
+   "tau3_banking": 7.0,
+   "aa_index": 11.2,
    "_note": "thinking"
   },
   "deepseek-v4-flash": {
-   "aa_index": 34
+   "aime26": 95.8,
+   "deepswe_v11": 53.3,
+   "tb21": 61.8,
+   "tau3_banking": 30.9,
+   "aa_index": 24.2,
+   "_note": "first open release (0420), max effort; the 0731 update scores higher (AA 34.3, TB 2.1 78.7)"
   },
   "deepseek-v4.1-flash": {
-   "gpqa_diamond": 90.9,
-   "hle": 36.8,
-   "aa_index": 39,
-   "_note": "max effort"
+   "tb21": 90.6,
+   "deepswe_v11": 74.2,
+   "aa_index": 39.5,
+   "_note": "max effort, 0910 release; the 1017 re-release has AA 45.1"
   },
   "gpt-oss-120b": {
-   "swe_bench_verified": 62.4,
-   "terminal_bench_2": 18.7,
-   "livecodebench": 87.8,
-   "aider_polyglot": 44.4,
-   "gpqa_diamond": 80.1,
-   "aime_2025": 92.5,
-   "hle": 14.9,
-   "aa_index": 12,
-   "_note": "reasoning high; TB2 from NVIDIA (arXiv 2602.21193)"
+   "tb21": 26.2,
+   "tau3_banking": 12.8,
+   "aa_index": 11.6,
+   "_note": "reasoning high"
   },
   "llama-3.1-8b": {
-   "livecodebench": 11.6,
-   "gpqa_diamond": 25.9,
-   "aime_2025": 4.3,
-   "mmlu_pro": 48.3,
-   "hle": 5.3,
-   "aa_index": 7
+   "tb21": 1.5,
+   "aa_index": 6.9,
+   "_note": "AA index is an AA estimate"
   },
   "gemma-4-12b": {
-   "livecodebench": 72.0,
-   "gpqa_diamond": 78.8,
-   "mmlu_pro": 77.2,
-   "hle": 5.2,
-   "aa_index": 14
+   "aime26": 77.5,
+   "tb21": 27.3,
+   "aa_index": 14.2,
+   "_note": "AA index is an AA estimate"
   },
   "glm-5.3": {
-   "aa_index": 45,
-   "_note": "thinking (max)"
+   "tb21": 88.2,
+   "deepswe_v11": 66.9,
+   "tau3_banking": 50.3,
+   "aa_index": 44.8,
+   "_note": "reasoning effort max; AA's own TB 2.1 run gives 83.9"
   },
   "nemotron-3.5-lightning-30b-a3b": {
-   "swe_bench_verified": 51.6,
-   "gpqa_diamond": 75.4,
-   "mmlu_pro": 81.9,
-   "hle": 11.7,
-   "aa_index": 13
+   "tb21": 24.6,
+   "tau3_banking": 9.3,
+   "aa_index": 12.9,
+   "_note": "reasoning on"
   },
   "kimi-k2.6": {
-   "swe_bench_verified": 80.2,
-   "terminal_bench_2": 66.7,
-   "livecodebench": 89.6,
-   "gpqa_diamond": 90.5,
-   "hle": 34.7,
-   "aa_index": 27,
+   "aime26": 96.4,
+   "tb21": 65.9,
+   "tau3_banking": 23.3,
+   "aa_index": 27.0,
    "_note": "thinking"
   },
   "kimi-k2.7-code": {
-   "aa_index": 26
+   "deepswe_v11": 30.5,
+   "tb21": 67.4,
+   "tau3_banking": 20.2,
+   "aa_index": 25.8
   },
   "qwen3-coder-480b-a35b": {
-   "swe_bench_verified": 69.6,
-   "terminal_bench_2": 23.9,
-   "livecodebench": 44.9,
-   "aider_polyglot": 60.4,
-   "aa_index": 12,
-   "_note": "SWE-bench with OpenHands, 500 turns; AA is an estimate"
+   "aa_index": 11.9,
+   "_note": "AA estimate"
+  },
+  "qwen3-coder-30b-a3b": {
+   "aa_index": 9.6,
+   "_note": "AA estimate"
   },
   "qwen3-coder-next": {
-   "swe_bench_verified": 70.6,
-   "terminal_bench_2": 36.2,
-   "livecodebench": 58.9,
-   "aider_polyglot": 66.2,
-   "gpqa_diamond": 74.5,
-   "aime_2025": 83.1,
-   "mmlu_pro": 80.5,
-   "aa_index": 9
+   "tb21": 38.2,
+   "tau3_banking": 5.4,
+   "aa_index": 9.2
   },
   "qwen3-235b-a22b-2507": {
-   "livecodebench": 74.1,
-   "gpqa_diamond": 81.1,
-   "aime_2025": 92.3,
-   "mmlu_pro": 84.4,
-   "hle": 18.2,
-   "aa_index": 13,
-   "_note": "scores are for the Thinking-2507 variant (same weights size)"
+   "tb21": 12.0,
+   "tau3_banking": 7.8,
+   "aa_index": 12.7,
+   "_note": "Thinking-2507 variant"
+  },
+  "mistral-small-3.2-24b": {
+   "tb21": 5.6,
+   "tau3_banking": 6.2,
+   "aa_index": 7.0
   },
   "devstral-small-2-24b": {
-   "swe_bench_verified": 68.0,
-   "terminal_bench_2": 22.5,
-   "aa_index": 8
+   "tb21": 29.6,
+   "tau3_banking": 10.7,
+   "aa_index": 7.5
   },
   "devstral-2-123b": {
-   "swe_bench_verified": 72.2,
-   "terminal_bench_2": 32.6,
-   "aa_index": 9
+   "tb21": 30.3,
+   "tau3_banking": 10.5,
+   "aa_index": 8.6
   },
   "magistral-small-2509": {
-   "livecodebench": 70.9,
-   "gpqa_diamond": 70.1,
-   "aime_2025": 77.3,
-   "aa_index": 9,
-   "_note": "thinking; LiveCodeBench v5"
+   "tb21": 4.5,
+   "tau3_banking": 4.5,
+   "aa_index": 8.6,
+   "_note": "AA index is an AA estimate"
   }
+ },
+ "released": {
+  "qwen3.6-27b": "2026-04-22",
+  "qwen3.8-flash-next": "2026-08-26",
+  "glm-5.3-flash": "2026-08-26",
+  "gemma-4-26b-a4b": "2026-04-02",
+  "gpt-oss-20b": "2025-08-05",
+  "qwen3.6-35b-a3b": "2026-04-16",
+  "gemma-4-31b": "2026-04-02",
+  "qwen3.5-9b": "2026-03-02",
+  "deepseek-v4-flash": "2026-04-24",
+  "deepseek-v4.1-flash": "2026-09-10",
+  "gpt-oss-120b": "2025-08-05",
+  "llama-3.1-8b": "2024-07-23",
+  "gemma-4-12b": "2026-06-03",
+  "glm-5.3": "2026-08-18",
+  "nemotron-3.5-lightning-30b-a3b": "2026-08-11",
+  "kimi-k2.6": "2026-04-20",
+  "kimi-k2.7-code": "2026-06-12",
+  "qwen3-coder-480b-a35b": "2025-07-22",
+  "qwen3-coder-30b-a3b": "2025-07-31",
+  "qwen3-coder-next": "2026-02-03",
+  "qwen3-235b-a22b-2507": "2025-07-21",
+  "mistral-small-3.2-24b": "2025-06-20",
+  "devstral-small-2-24b": "2025-12-09",
+  "devstral-2-123b": "2025-12-09",
+  "magistral-small-2509": "2025-09-17"
  }
 }
