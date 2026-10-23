@@ -1333,6 +1333,84 @@
     "MiMo-V2.6-Flash MOPD"
    ],
    "ran": "an IQ2_XXS/XS mix (88.8 GB)"
+  },
+  "m4-max-128gb|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    14.9,
+    18.22
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://huggingface.co/batiai/Qwen3.6-27B-GGUF"
+   ]
+  },
+  "m5-max-128gb|qwen3.6-27b|q8_0": {
+   "tier": "measured",
+   "gen_tps": [
+    16.2,
+    19.8
+   ],
+   "prefill_tps": null,
+   "sources": [
+    "https://github.com/stared/benching-local-llms-on-apple-silicon"
+   ]
+  },
+  "mac-mini-m5-pro-64gb|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    13.86,
+    16.94
+   ],
+   "prefill_tps": [
+    [
+     322.2,
+     393.8
+    ],
+    [
+     344.7,
+     421.3
+    ],
+    [
+     346.5,
+     423.5
+    ],
+    [
+     277.2,
+     338.8
+    ]
+   ],
+   "sources": [
+    "https://arxiv.org/abs/2607.19438"
+   ]
+  },
+  "m5-pro-48gb|qwen3.6-27b|q4_k_m": {
+   "tier": "measured",
+   "gen_tps": [
+    13.86,
+    16.94
+   ],
+   "prefill_tps": [
+    [
+     322.2,
+     393.8
+    ],
+    [
+     344.7,
+     421.3
+    ],
+    [
+     346.5,
+     423.5
+    ],
+    [
+     277.2,
+     338.8
+    ]
+   ],
+   "sources": [
+    "https://arxiv.org/abs/2607.19438"
+   ]
   }
  },
  "cluster_runs": [
@@ -1916,7 +1994,7 @@
   "decode_k_dense": 100000,
   "decode_k_moe": 50000,
   "prefill_k": 30000,
-  "note": "Past from_tokens, speed scales by (1 + from/K) / (1 + ctx/K). Plain full-attention K values fit llama.cpp long-context rows for Qwen3-30B-A3B and Devstral 2 on RTX 3090/4090/5090/PRO 6000. Models with sliding-window or hybrid linear attention (listed in efficient_attention) slow down 2-3x less; their K values are medians of measured Mac (oMLX, Metal), Strix Halo and DGX Spark depth sweeps.",
+  "note": "Past from_tokens, speed scales by (1 + from/K) / (1 + ctx/K). Plain full-attention K values fit llama.cpp long-context rows for Qwen3-30B-A3B and Devstral 2 on RTX 3090/4090/5090/PRO 6000. Models with sliding-window or hybrid linear attention (listed in efficient_attention) slow down 2-3x less; their K values are medians of measured Mac (oMLX, Metal), Strix Halo and DGX Spark depth sweeps. On Metal, dense efficient-attention models use prefill_k_efficient_metal_dense: oMLX sweeps of Qwen3.6-27B on an M5 Max fit K of 57K (16K prompt) and 91K (32K prompt), while the Qwen3.6-35B-A3B sweep fits under 20K, so MoE models keep the shared value.",
   "decode_k_efficient": 150000,
   "prefill_k_efficient": 40000,
   "efficient_attention": [
@@ -1936,7 +2014,38 @@
    "https://www.hardware-corner.net/gpu-llm-benchmarks/rtx-pro-6000-blackwell/",
    "https://github.com/kyuz0/amd-strix-halo-toolboxes/tree/main/benchmark/results",
    "https://omlx.ai/benchmarks/66ckcde6",
-   "https://github.com/ggml-org/llama.cpp/blob/master/benches/dgx-spark/dgx-spark.md"
+   "https://github.com/ggml-org/llama.cpp/blob/master/benches/dgx-spark/dgx-spark.md",
+   "https://omlx.ai/benchmarks/vsufu8n9"
+  ],
+  "prefill_k_efficient_metal_dense": 60000
+ },
+ "prefill_mult": {
+  "note": "M5 GPUs have a matrix unit in every core that llama.cpp drives through the Metal 4 tensor API; the FP16 TFLOPS in the hardware specs leave it out. Factors scale the pipeline prefill (spec TFLOPS x Metal efficiency x 1.11). Dense: llama.cpp pp512 over that value is 2.2 for Qwen3.6-27B on an M5 Pro (392 vs 178) and 2.2 for LLaMA 7B Q4_0 on the M5 Pro and M5 Max in discussion 4167; the M5 Ultra row there gives 1.7. MoE: median over Gemma-4-26B-A4B, Qwen3-30B-A3B and Qwen3.6-35B-A3B on the M5 Pro (1.37, 1.39, 1.03); Ultra scaled by the same 0.77 as dense.",
+  "hardware": {
+   "m5-pro-48gb": {
+    "dense": 2.2,
+    "moe": 1.35
+   },
+   "mac-mini-m5-pro-64gb": {
+    "dense": 2.2,
+    "moe": 1.35
+   },
+   "m5-max-128gb": {
+    "dense": 2.2,
+    "moe": 1.35
+   },
+   "mac-studio-m5-ultra-256gb": {
+    "dense": 1.7,
+    "moe": 1.05
+   },
+   "mac-studio-m5-ultra-512gb": {
+    "dense": 1.7,
+    "moe": 1.05
+   }
+  },
+  "sources": [
+   "https://arxiv.org/abs/2607.19438",
+   "https://github.com/ggml-org/llama.cpp/discussions/4167"
   ]
  }
 }

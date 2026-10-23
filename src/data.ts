@@ -125,6 +125,8 @@ export interface LongCtx {
   /** sliding-window / hybrid linear attention models slow down much less with depth */
   decode_k_efficient: number
   prefill_k_efficient: number
+  /** Metal override of prefill_k_efficient for dense models */
+  prefill_k_efficient_metal_dense?: number
   efficient_attention: string[]
 }
 
@@ -144,17 +146,24 @@ interface AppData {
   /** first open-weights release, YYYY-MM-DD */
   released?: Record<string, string>
   projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>>
+  /** per-hardware prefill multipliers for chips whose compute the TFLOPS spec understates */
+  prefill_mult?: { hardware: Record<string, { dense: number; moe: number }> }
 }
 
 // Hand-curated entries (new models, cluster setups) live in app-data.projected.json so a
-// pipeline re-run can't overwrite them. Lists are appended; the pipeline wins on id clashes.
+// pipeline re-run can't overwrite them. Lists are appended; the pipeline wins on id clashes,
+// except that a measured overlay combo replaces a pipeline combo that is only derived or projected
+// (keeping the pipeline's prefill when the overlay has none).
 const EXTRA = projected as unknown as Partial<AppData>
+const RAW_COMBOS = (raw as unknown as AppData).combos
 const merge = <T extends { id: string }>(base: T[], extra: T[] = []) => [...base, ...extra.filter(e => !base.some(b => b.id === e.id))]
 const DATA: AppData = {
   ...(raw as unknown as AppData),
   hardware: merge((raw as unknown as AppData).hardware, EXTRA.hardware),
   models: merge((raw as unknown as AppData).models, EXTRA.models),
-  combos: { ...EXTRA.combos, ...(raw as unknown as AppData).combos },
+  combos: { ...EXTRA.combos, ...RAW_COMBOS, ...Object.fromEntries(Object.entries(EXTRA.combos ?? {})
+    .filter(([k, c]) => c.tier === 'measured' && RAW_COMBOS[k] && RAW_COMBOS[k].tier !== 'measured')
+    .map(([k, c]) => [k, c.prefill_tps ? c : { ...c, prefill_tps: RAW_COMBOS[k].prefill_tps }])) },
   links: EXTRA.links,
   cluster_runs: EXTRA.cluster_runs,
   benchmarks: EXTRA.benchmarks,
@@ -162,6 +171,7 @@ const DATA: AppData = {
   released: EXTRA.released,
   long_context: EXTRA.long_context,
   projected_decode_eff: EXTRA.projected_decode_eff,
+  prefill_mult: EXTRA.prefill_mult,
 }
 
 export const HW: Hw[] = [...DATA.hardware].sort((a, b) => a.popularity_rank - b.popularity_rank)
@@ -193,6 +203,12 @@ export function coeffs(backend: Backend): Coeffs {
 export function decodeEff(backend: Backend, moe: boolean): number {
   const e = DATA.projected_decode_eff?.[backend]
   return e ? (moe ? e.moe : e.dense) : coeffs(backend).decode_bw_eff
+}
+
+/** prefill multiplier for this hardware, 1 unless the overlay calibrates one */
+export function prefillMult(hwId: string, moe: boolean): number {
+  const p = DATA.prefill_mult?.hardware[hwId]
+  return p ? (moe ? p.moe : p.dense) : 1
 }
 
 export const LONG_CTX: LongCtx = DATA.long_context ?? { from_tokens: 12500, decode_k_dense: 100000, decode_k_moe: 50000, prefill_k: 30000, decode_k_efficient: 150000, prefill_k_efficient: 40000, efficient_attention: [] }
@@ -242,6 +258,12 @@ export const clusterRuns = (hwId: string, modelId: string) =>
 
 export function combo(hwId: string, modelId: string, quantId: string): ComboPred | undefined {
   return DATA.combos[`${hwId}|${modelId}|${quantId}`]
+}
+
+/** the combo in effect is a hand-curated one with its own measured prefill */
+export function handPrefill(hwId: string, modelId: string, quantId: string): boolean {
+  const k = `${hwId}|${modelId}|${quantId}`
+  return !!DATA.combos[k]?.prefill_tps && DATA.combos[k] === EXTRA.combos?.[k]
 }
 
 // Share URLs minted before the pipeline-style catalog ids existed. Catalog ids are

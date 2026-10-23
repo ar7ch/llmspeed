@@ -1,4 +1,4 @@
-import { coeffs, combo, decodeEff, linkFor, LONG_CTX, OFFLOAD, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
+import { coeffs, combo, decodeEff, handPrefill, linkFor, LONG_CTX, OFFLOAD, prefillMult, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
 
 export type Fit = 'fits' | 'partial' | 'no'
 export type Conf = 'measured' | 'derived' | 'projected' | null
@@ -74,6 +74,9 @@ function comboPrefill(cb: ComboPred | undefined, ctx: number, prefillK: number):
   return mids[n - 1] * longCtx(ctx, prefillK)
 }
 
+/** the pipeline's formula-derived combos put preset-0 prefill at this multiple of the spec formula */
+const PIPE_PREFILL_RATIO = 1.11
+
 /** CUDA/Metal context, compute buffers and other runtime memory on top of weights and KV */
 export const RUNTIME_GB = 0.6
 
@@ -92,7 +95,11 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, kvq: KvQ = 
   const shortDerate = Math.pow(co.ctx_derate_per_8k, Math.min(ctx, LONG_CTX.from_tokens) / 8192)
   const efficientAttn = LONG_CTX.efficient_attention.includes(m.id)
   const decodeK = efficientAttn ? LONG_CTX.decode_k_efficient : moe ? LONG_CTX.decode_k_moe : LONG_CTX.decode_k_dense
-  const prefillK = efficientAttn ? LONG_CTX.prefill_k_efficient : LONG_CTX.prefill_k
+  // Metal depth sweeps of dense efficient-attention models lose prefill speed more slowly than the
+  // cross-backend median. The Metal MoE sweep drops faster, so MoE models keep the shared value.
+  const prefillK = !efficientAttn ? LONG_CTX.prefill_k
+    : hw.backend === 'metal' && !moe ? LONG_CTX.prefill_k_efficient_metal_dense ?? LONG_CTX.prefill_k_efficient
+    : LONG_CTX.prefill_k_efficient
   const derate = shortDerate * longCtx(ctx, decodeK)
   const aw = w * (m.active_params_b / m.total_params_b)
   const cb = combo(hw.id, m.id, q.id)
@@ -113,7 +120,7 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, kvq: KvQ = 
   // Partial fit: hybrid two-bandwidth model. The GPU-resident share of the
   // active weights streams at GPU bandwidth, the spilled share at effective
   // system-RAM bandwidth (calibrated by the pipeline from measured offload
-  // runs) — the two terms add in series. Overrides both paths above: a combo
+  // runs) - the two terms add in series. Overrides both paths above: a combo
   // measured full-GPU says nothing about this card's offload behavior.
   let gpuShare = 1
   if (fit === 'partial') {
@@ -140,7 +147,15 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, kvq: KvQ = 
   if (hw.status === 'announced') conf = 'projected'
   const base = (lo + hi) / 2
 
-  let pre = (comboPrefill(cb, ctx, prefillK) ?? (hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)) * shortDerate * longCtx(ctx, prefillK)) * preF
+  // NOTE: M5 GPUs have matrix units the FP16 TFLOPS spec leaves out, so the pipeline's prefill and the
+  // formula both get a per-chip multiplier from the overlay. Pipeline combos whose prefill is the formula
+  // sit at PIPE_PREFILL_RATIO x the formula; a measured row above that already shows part of the speedup,
+  // so only the rest is applied (M5 Pro gpt-oss-20b runs at 1.68x and gets none). Hand-curated combos
+  // carry measured prefill and are left alone.
+  const formulaPre = hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)
+  const seen = cb?.prefill_tps?.length ? (cb.prefill_tps[0][0] + cb.prefill_tps[0][1]) / 2 / (formulaPre * PIPE_PREFILL_RATIO) : 1
+  const preMult = handPrefill(hw.id, m.id, q.id) ? 1 : Math.max(1, prefillMult(hw.id, moe) / Math.max(1, seen))
+  let pre = (comboPrefill(cb, ctx, prefillK) ?? formulaPre * shortDerate * longCtx(ctx, prefillK)) * preF * preMult
   if (fit === 'partial') pre *= 0.5
   const ttft = ctx / pre + (fit === 'partial' ? 1.2 : 0.3)
 

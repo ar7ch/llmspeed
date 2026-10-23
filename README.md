@@ -38,7 +38,7 @@ Every estimate is labeled with how much to trust it:
 **The model.** When no benchmark exists, llmspeed falls back to first principles:
 
 - **Generation speed** is bound by memory bandwidth: every token reads the active weights once. For mixture-of-experts models only the active parameters count.
-- **Prompt processing** is bound by compute (FP16 TFLOPS).
+- **Prompt processing** is bound by compute (FP16 TFLOPS). M5 Macs get a per-chip multiplier for the matrix units in their GPU cores, which the TFLOPS figure leaves out.
 - Both use per-backend efficiency coefficients calibrated against the measured benchmarks, plus a slowdown as context grows.
 - **Partial offload** uses a hybrid model: the GPU-resident share streams at GPU bandwidth and the spilled share at an effective system-RAM bandwidth, calibrated from measured offload runs.
 - **Memory fit** counts weights, KV cache and runtime overhead against usable memory: about 75% of unified memory on Macs and 93% of VRAM on discrete GPUs. The KV cache defaults to F16, which llama.cpp, Ollama and LM Studio all use unless told otherwise; Q8_0 and Q4_0 caches can be picked in the quantization menu. The cache type changes memory only, not the speed estimate.
@@ -84,6 +84,7 @@ Built with [Vite](https://vite.dev), [Preact](https://preactjs.com) and TypeScri
 
 - **Clusters are projected.** Multi-device speeds scale a single-device estimate by per-link factors calibrated from a handful of published runs; most of those runs used engine-native formats (MLX, NVFP4, AWQ), not GGUF.
 - **Mac memory** assumes the default macOS GPU limit (about 75% of unified memory). Raising it with `sysctl` fits bigger models; the app says how much.
+- **M5 prompt processing** assumes an engine that uses the Metal 4 tensor API, as current llama.cpp does. Builds without it, such as some LM Studio runtimes, can process prompts about half as fast.
 - **Estimates, not guarantees.** Drivers, engine versions, flash attention, power limits and thermals can all move real numbers by 10–30%.
 - **Projected numbers** for unreleased hardware will be replaced with measurements as they appear.
 
