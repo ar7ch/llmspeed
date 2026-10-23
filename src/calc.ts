@@ -2,6 +2,10 @@ import { coeffs, combo, decodeEff, linkFor, LONG_CTX, OFFLOAD, PROMPT_PRESET_TOK
 
 export type Fit = 'fits' | 'partial' | 'no'
 export type Conf = 'measured' | 'derived' | 'projected' | null
+/** context (KV) cache precision; llama.cpp, Ollama and LM Studio all default to f16 */
+export type KvQ = 'f16' | 'q8_0' | 'q4_0'
+/** cache size relative to f16 (q8_0 and q4_0 store 8.5 and 4.5 bits per value) */
+export const KV_BYTES: Record<KvQ, number> = { f16: 1, q8_0: 8.5 / 16, q4_0: 4.5 / 16 }
 
 export interface CalcResult {
   /** weight memory, GB */
@@ -35,6 +39,7 @@ export interface CalcResult {
   /** decode and prefill multipliers from clustering (1 for a single device) */
   decF: number
   preF: number
+  kvq: KvQ
 }
 
 // NOTE: inferred, no source measured it: replicated embeddings, norms and runtime buffers per node
@@ -72,10 +77,12 @@ function comboPrefill(cb: ComboPred | undefined, ctx: number, prefillK: number):
 /** CUDA/Metal context, compute buffers and other runtime memory on top of weights and KV */
 export const RUNTIME_GB = 0.6
 
-export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult {
+// NOTE: the cache type changes memory only; measured decode with a quantized cache is about
+// the same or slightly slower than f16, so speed is left as is
+export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, kvq: KvQ = 'f16'): CalcResult {
   const co = coeffs(hw.backend)
   const w = m.quants[q.id] ? m.quants[q.id].file_gb : m.total_params_b * (FALLBACK_BPP[q.id] ?? 2)
-  const kv = Math.max(0.15, m.kv_gb_per_8k * (ctx / 8192))
+  const kv = Math.max(0.15, m.kv_gb_per_8k * KV_BYTES[kvq] * (ctx / 8192))
   const usable = (hw.vendor === 'apple' ? hw.vram_gb * 0.75 : hw.vram_gb * 0.93) * (n > 1 ? n * CLUSTER_MEM_EFF : 1)
   const total = w + kv + RUNTIME_GB
   // clusters don't offload to system RAM: the model fits in pooled memory or doesn't run
@@ -138,7 +145,7 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult
   const ttft = ctx / pre + (fit === 'partial' ? 1.2 : 0.3)
 
   if (fit === 'no') conf = null
-  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: fit === 'partial' ? co.decode_bw_eff : eff, aw, fromCombo, gpuShare, n, decF, preF }
+  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: fit === 'partial' ? co.decode_bw_eff : eff, aw, fromCombo, gpuShare, n, decF, preF, kvq }
 }
 
 export function fmt(x: number): string {

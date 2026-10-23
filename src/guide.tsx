@@ -25,7 +25,7 @@ function noFit(a: CalcResult): string {
   const gb = (x: number) => `${x.toFixed(1)} GB`
   const r1 = (x: number) => Math.round(x * 10) / 10
   // NOTE: the total is the sum of the rounded parts, so the shown sum adds up
-  const sum = `weights ${gb(a.w)} + 256K cache ${gb(a.kv)} + runtime ${gb(RUNTIME_GB)} = ${gb(r1(a.w) + r1(a.kv) + RUNTIME_GB)}, over the ${gb(a.usable)} usable`
+  const sum = `weights ${gb(a.w)} + 256K ${a.kvq.toUpperCase()} cache ${gb(a.kv)} + runtime ${gb(RUNTIME_GB)} = ${gb(r1(a.w) + r1(a.kv) + RUNTIME_GB)}, over the ${gb(a.usable)} usable`
   const room = a.usable - a.w - RUNTIME_GB
   // NOTE: KV grows linearly with context, so the room left after weights sets the longest context
   const maxK = Math.floor(room / a.kv * (AGENT_CTX / 1024))

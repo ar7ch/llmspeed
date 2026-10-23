@@ -41,7 +41,7 @@ Every estimate is labeled with how much to trust it:
 - **Prompt processing** is bound by compute (FP16 TFLOPS).
 - Both use per-backend efficiency coefficients calibrated against the measured benchmarks, plus a slowdown as context grows.
 - **Partial offload** uses a hybrid model: the GPU-resident share streams at GPU bandwidth and the spilled share at an effective system-RAM bandwidth, calibrated from measured offload runs.
-- **Memory fit** counts weights, KV cache and runtime overhead against usable memory: about 75% of unified memory on Macs and 93% of VRAM on discrete GPUs.
+- **Memory fit** counts weights, KV cache and runtime overhead against usable memory: about 75% of unified memory on Macs and 93% of VRAM on discrete GPUs. The KV cache defaults to F16, which llama.cpp, Ollama and LM Studio all use unless told otherwise; Q8_0 and Q4_0 caches can be picked in the quantization menu. The cache type changes memory only, not the speed estimate.
 
 ## Contributing benchmarks
 

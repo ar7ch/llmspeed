@@ -1,6 +1,6 @@
 import { Component, type ComponentChild } from 'preact'
 import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
-import { calc, fmt, RUNTIME_GB, type CalcResult, type Fit } from './calc'
+import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
 import { BenchChart, fmtScore, rankModels } from './bench'
@@ -46,6 +46,8 @@ interface St {
   hwQ: string
   /** minimum tok/s for the best-pick ranking, shared by the chart card and the model picker */
   floor: number
+  /** context cache precision, applied to every setup */
+  kvq: KvQ
   lanes: LaneSt[]; racePrompt: string; shared: boolean; dark: boolean
   feelPhase: 'type' | 'hold' | 'erase'; feelN: number; feelT: number
   isMobile: boolean; cfgOpen: boolean; composerH: number
@@ -71,7 +73,7 @@ export class App extends Component<{}, St> {
     const base: St = {
       cfgs: [{ hw: 'rtx-4090', model: 'llama-3.1-8b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
       streamText: '', liveTok: 0, prefillT: 0, breakdownOpen: false, history: [],
-      dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', floor: 10, bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
+      dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', floor: 10, kvq: 'f16', bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
       // index.html picks the theme before first paint (saved choice, else system setting)
       dark: typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'),
       feelPhase: 'type', feelN: 0, feelT: 0,
@@ -94,6 +96,8 @@ export class App extends Component<{}, St> {
           if (ch && cm && cm.quants[cfg.quant]) cfgs.push({ ...cfg, n: clampNodes(ch, ns[i] || ns[0]) })
         }
         if (cfgs.length) base.cfgs = cfgs
+        const kv = qs.get('kv')
+        if (kv && Object.keys(KV_BYTES).includes(kv)) base.kvq = kv as KvQ
         const p = qs.get('preset')
         if (p !== null && PRESETS[+p]) base.preset = +p
         const t = qs.get('prompt')
@@ -328,7 +332,7 @@ export class App extends Component<{}, St> {
     track('run', { mode: s.cfgs.length > 1 ? 'race' : 'single', hw: s.cfgs.map(c => c.hw).join(','), n: s.cfgs.map(c => c.n ?? 1).join(','), model: s.cfgs.map(c => c.model).join(','), quant: s.cfgs.map(c => c.quant).join(','), prompt: s.custom !== null ? 'custom' : PRESETS[s.preset].label })
     const lanes: RunLane[] = s.cfgs.map(cfg => {
       const { hw, m, q, n } = this.resolve(cfg)
-      const c = calc(hw, m, q, ctx, n)
+      const c = calc(hw, m, q, ctx, n, this.state.kvq)
       return { hw, m, q, c, norun: c.fit === 'no', acc: 0, i: 0, done: c.fit === 'no', streamStarted: false, liveTok: c.base, finishT: 0 }
     })
     if (lanes.every(l => l.c.fit === 'no')) return
@@ -442,6 +446,7 @@ export class App extends Component<{}, St> {
     q.set('model', s.cfgs.map(c => c.model).join(','))
     q.set('quant', s.cfgs.map(c => c.quant).join(','))
     if (s.cfgs.some(c => (c.n ?? 1) > 1)) q.set('n', s.cfgs.map(c => c.n ?? 1).join(','))
+    if (s.kvq !== 'f16') q.set('kv', s.kvq)
     if (s.custom !== null) q.set('prompt', s.custom.slice(0, 2000))
     else q.set('preset', String(s.preset))
     q.set('run', '1')
@@ -456,7 +461,7 @@ export class App extends Component<{}, St> {
 
   cfgRow(i: number) {
     const s = this.state, cfg = s.cfgs[i], { hw, m, q, n } = this.resolve(cfg), ctx = this.promptTokens()
-    const c = calc(hw, m, q, ctx, n)
+    const c = calc(hw, m, q, ctx, n, this.state.kvq)
     const compare = this.isCompare()
     const setCfg = (patch: Partial<Cfg>) => this.setState(x => ({
       cfgs: x.cfgs.map((cc, j) => {
@@ -476,7 +481,7 @@ export class App extends Component<{}, St> {
     void fc
     // rank markers: the best-pick ranking for this setup and the chart's benchmark
     const bench = BENCHES.find(b => b.id === s.bench)
-    const ranked = bench ? rankModels(hw, n, ctx, bench, s.floor) : []
+    const ranked = bench ? rankModels(hw, n, ctx, bench, s.floor, s.kvq) : []
     const okRanked = ranked.filter(x => x.ok).sort((x, y) => y.adj - x.adj)
     const rankedOf = (mm: Model) => ranked.find(r => r.m.id === mm.id)
     // per-row estimates use the ranked quant when the model has one (that's what picking it
@@ -497,13 +502,18 @@ export class App extends Component<{}, St> {
     const ctxLabel = (t: number) => t >= 1048576 ? `${+(t / 1048576).toFixed(1)}M ctx` : `${Math.round(t / 1024)}K ctx`
     const rankKey = (mm: Model) => { const x = rankedOf(mm); return x ? (x.ok ? 2e6 : 1e6) + x.adj : 0 }
     // the dropdown's estimate for a model, at rowQuant
-    const mcalc = (mm: Model) => rankedOf(mm)?.c ?? calc(hw, mm, quantOf(rowQuant(mm)), ctx, n)
+    const mcalc = (mm: Model) => rankedOf(mm)?.c ?? calc(hw, mm, quantOf(rowQuant(mm)), ctx, n, s.kvq)
     const score = (mm: Model) => scoresOf(mm.id)[s.bench] as number | undefined
     const sortBtn = (act: boolean) => `border-radius:99px; padding:3px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap; ${act ? 'background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)' : 'background:none; border:1px solid var(--c-border); color:var(--c-text-muted)'}`
     return {
       showPreset: i === 0, showBadge: compare, rowBadge: i ? 'B' : 'A',
       rowBadgeStyle: `width:20px; height:20px; border-radius:6px; background:${i ? 'var(--c-badge-b-bg)' : 'var(--c-bg-muted)'}; color:${i ? 'var(--c-badge-b)' : 'var(--c-text-sec)'}; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0`,
-      hwName: setupName(hw, n), modelName: m.name, quantName: q.label,
+      hwName: setupName(hw, n), modelName: m.name, quantName: q.label + (s.kvq === 'f16' ? '' : ` · KV ${s.kvq.toUpperCase()}`),
+      kvBtns: (['f16', 'q8_0', 'q4_0'] as KvQ[]).map(id => ({
+        label: id.toUpperCase(),
+        pick: (e: Event) => { e.stopPropagation(); this.setState({ kvq: id }) },
+        style: sortBtn(s.kvq === id),
+      })),
       hwDdOpen: s.dd === dd('hw'), modelDdOpen: s.dd === dd('model'), quantDdOpen: s.dd === dd('quant'),
       toggleHwDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('hw') ? null : dd('hw'), hwQ: '' })) },
       hwQ: s.hwQ,
@@ -531,7 +541,7 @@ export class App extends Component<{}, St> {
       })),
       hwOpts: this.groupOpts(
         HW.filter(h => App.matches(s.hwQ, `${h.name} ${h.id}`)).sort((a, b) => s.hwSort === 'ram' ? b.vram_gb - a.vram_gb || a.popularity_rank - b.popularity_rank : a.popularity_rank - b.popularity_rank),
-        h => calc(h, m, q, ctx, clampNodes(h, n)).fit,
+        h => calc(h, m, q, ctx, clampNodes(h, n), s.kvq).fit,
         h => ({ name: h.name, meta: `${h.vram_gb} GB${h.status === 'announced' ? ' · announced' : ''}`, sel: h.id === cfg.hw, pick: () => setCfg({ hw: h.id }) })),
       modelOpts: this.groupOpts(
         MODELS.filter(mm => App.matches(s.modelQ, `${mm.name} ${mm.id}`)).sort((a, b) => (s.modelSort === 'best' ? rankKey(b) - rankKey(a)
@@ -545,7 +555,7 @@ export class App extends Component<{}, St> {
         mm => ({ name: mm.name, meta: [s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
           : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
           : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, ctxLabel(mm.context_max), releasedLabel(mm.id)].filter(Boolean).map(x => x.replace(/ /g, '\u00a0')).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
-      quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n).fit })).map(({ qq, fit }) => ({
+      quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n, s.kvq).fit })).map(({ qq, fit }) => ({
         name: qq.label, meta: [quantNote(qq.id, m.total_params_b), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
         fitColor: fit === 'no' ? fitColors.no : fit === 'partial' ? fitColors.partial : '',
         pick: () => setCfg({ quant: qq.id }),
@@ -596,19 +606,19 @@ export class App extends Component<{}, St> {
         ttft: c.fit === 'no' ? '—' : (c.ttft < 10 ? c.ttft.toFixed(2).replace(/0$/, '') : String(Math.round(c.ttft))) + ' s',
         confLabel: conf[0], confDotStyle: `width:8px; height:8px; border-radius:50%; background:${conf[1]}; display:inline-block`,
         showTips: i === 0 && !compare,
-        workloads: !compare && c.fit !== 'no' ? workloads(c, calc(r._hw, r._m, r._q, AGENT_CTX, c.n), r._m.context_max) : [],
+        workloads: !compare && c.fit !== 'no' ? workloads(c, calc(r._hw, r._m, r._q, AGENT_CTX, c.n, c.kvq), r._m.context_max) : [],
       }
     })
     const mkRows = (r: ReturnType<App['cfgRow']>) => {
       const c = r._c, m = r._m, hw = r._hw, q = r._q
       return c.fit === 'no' ? [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },
-        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k)`, v: `${c.kv.toFixed(1)} GB` },
+        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k at F16${c.kvq === 'f16' ? '' : `, × ${KV_BYTES[c.kvq].toFixed(2)} at ${c.kvq.toUpperCase()}`})`, v: `${c.kv.toFixed(1)} GB` },
         { n: '3', f: `Total with ${RUNTIME_GB} GB runtime vs usable memory (${hw.vendor === 'apple' ? '75% of unified' : '93% of VRAM'}${c.n > 1 ? `, pooled over ${c.n} devices` : ''})`, v: `${c.total.toFixed(1)} / ${c.usable.toFixed(1)} GB` },
         { n: '4', f: 'Result', v: "won't run" },
       ] : [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },
-        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k)`, v: `${c.kv.toFixed(1)} GB` },
+        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k at F16${c.kvq === 'f16' ? '' : `, × ${KV_BYTES[c.kvq].toFixed(2)} at ${c.kvq.toUpperCase()}`})`, v: `${c.kv.toFixed(1)} GB` },
         { n: '3', f: `Fit: ${c.total.toFixed(1)} GB needed vs ${c.usable.toFixed(1)} GB usable`, v: c.fit === 'fits' ? 'fits' : 'partial offload' },
         { n: '4', f: c.fit === 'partial'
           ? `Decode: hybrid offload — ${Math.round(c.gpuShare * 100)}% of active weights read at GPU speed (${hw.bandwidth_gbs} GB/s × ${c.eff}), ${Math.round((1 - c.gpuShare) * 100)}% at system-RAM speed (~${OFFLOAD.ram_bw_gbs} GB/s)`
@@ -631,7 +641,7 @@ export class App extends Component<{}, St> {
       const curGb = m.quants[q.id] ? m.quants[q.id].file_gb : Infinity
       for (const alt of quantsFor(m)) {
         if (m.quants[alt.id].file_gb >= curGb) continue
-        const ac = calc(hw, m, alt, ctx, n)
+        const ac = calc(hw, m, alt, ctx, n, s.kvq)
         if (ac.fit === 'fits') { suggShow = true; suggQ = alt.id; suggLabel = `Switch to ${alt.label} — fits, ~${fmt(ac.lo)}–${fmt(ac.hi)} tok/s`; break }
       }
     }
@@ -889,7 +899,7 @@ export class App extends Component<{}, St> {
         </div>
         {v.heroMode && (() => {
           const { hw, n } = this.resolve(this.state.cfgs[0])
-          return <BenchChart hw={hw} n={n} bench={this.state.bench} setBench={b => this.setState({ bench: b })} floor={this.state.floor} setFloor={f => this.setState({ floor: f })} ctx={this.promptTokens()} model={this.state.cfgs[0].model}
+          return <BenchChart hw={hw} n={n} bench={this.state.bench} setBench={b => this.setState({ bench: b })} floor={this.state.floor} setFloor={f => this.setState({ floor: f })} kvq={this.state.kvq} ctx={this.promptTokens()} model={this.state.cfgs[0].model}
             setHw={(h, n) => this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, hw: h.id, n } : c) }))}
             pick={(m, q) => { this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, model: m.id, quant: q.id } : c) })); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
         })()}
@@ -1080,6 +1090,11 @@ export class App extends Component<{}, St> {
                   </button>
                   {r.quantDdOpen && (
                     <div ref={this._menuRef} style={`position:absolute; ${v.menuAnchor}; left:0; width:min(330px, calc(100vw - 48px)); background:var(--c-bg); border:1px solid var(--c-border); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.1); z-index:30; padding:6px; display:flex; flex-direction:column`}>
+                      <div style="display:flex; gap:4px; padding:4px 4px 2px; flex-wrap:wrap; align-items:center">
+                        <span style="font-size:11px; color:var(--c-text-faint); padding:0 6px">Context cache</span>
+                        {r.kvBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
+                      </div>
+                      <div style="font-size:11px; color:var(--c-text-faint); padding:0 10px 8px; line-height:1.45">F16 is the default everywhere. Q8_0 halves the cache with almost no quality loss; Q4_0 saves more but hurts long context and code.</div>
                       {r.quantOpts.map((o, j) => (
                         <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style={`font-family:'IBM Plex Mono',monospace; ${o.fitColor ? `color:${o.fitColor}` : ''}`}>{o.name}</span><span style={`font-size:11px; color:${o.fitColor || 'var(--c-text-faint)'}; flex-shrink:0`}>{o.meta}</span></button>
                       ))}
