@@ -41,22 +41,21 @@ export function workloads(c: CalcResult, at: (ctx: number) => CalcResult, contex
   const maxCtx = Math.min(contextMax, memMax)
   const depth = Math.min(maxCtx, AGENT_CTX)
   const agent = depth > 0 ? at(depth) : null
-  // leave room for the reply when the setup holds less than the starting context (maxCtx is a
-  // multiple of 1024 when depth > 0, so this stays positive)
-  const start = depth > 0 ? at(Math.min(AGENT_START, maxCtx - STEP_REPLY)) : null
+  // an agent can't take its first step without room for the starting context and a reply
+  const start = maxCtx >= AGENT_START + STEP_REPLY ? at(AGENT_START) : null
+  const firstStep = start ? start.ttft + STEP_REPLY / start.base : 0
   return [
     { label: 'Chat', head: cap(band(t, [5, 10, 20, 40], ['slower than you read', 'reading speed', 'comfortable', 'snappy', 'faster than you read'])),
       detail: `${fmt(t)} tok/s; you read about ${READING_TPS}`, good: t >= 10 },
     { label: 'Coding help', head: cap(band(t, [5, 10, 20, 40], ['unusable', 'sluggish', 'usable', 'good', 'great'])),
       detail: `writes a 300-line file (~3K tokens) in ${secs(3000 / t)}`, good: t >= 10 },
-    agent
-      // a rating at a short depth reads faster than one at 256K, so the headline names the depth
-      ? { label: 'Agentic coding', head: cap(band(agent.base, [10, 20, 40, 80], ['too slow', 'slow', 'workable', 'good', 'great'])) + (depth < AGENT_CTX ? ` at ${ctxK(depth)}` : ''),
-          detail: `${ctxK(maxCtx)} max context${maxCtx < AGENT_CTX ? ' (256K recommended)' : ''}; ${fmt(agent.base)} tok/s at ${ctxK(depth)}, first step ${secs(start!.ttft + STEP_REPLY / start!.base)}`,
-          // the context fills gradually and earlier turns stay cached, so decode speed at depth decides
-          good: maxCtx >= AGENT_CTX && agent.base >= 20 }
+    agent && start
+      ? { label: 'Agentic coding', head: cap(band(firstStep, [10, 20, 45, 90], ['great', 'good', 'workable', 'slow', 'too slow'])),
+          detail: `${ctxK(maxCtx)} max context${maxCtx < AGENT_CTX ? ' (256K recommended)' : ''}; first step ${secs(firstStep)}, ${fmt(agent.base)} tok/s at ${ctxK(depth)}`,
+          // the context fills gradually with earlier turns cached, so the first step is what the user waits for
+          good: maxCtx >= AGENT_CTX && firstStep < 45 }
       : { label: 'Agentic coding', head: 'Won\'t fit', good: false,
-          detail: 'no memory left for context after the weights' },
+          detail: maxCtx <= 0 ? 'no memory left for context after the weights' : `${ctxK(maxCtx)} max context; an agent starts with about ${AGENT_START / 1000}K` },
     { label: 'Reasoning', head: think < 30 ? 'Quick' : think < 90 ? 'Noticeable wait' : 'Long wait',
       detail: `a ${THINK_TOKENS / 1000}K-token hidden think takes ${secs(think)}`, good: think < 30 },
   ]
@@ -76,12 +75,12 @@ export function quantNote(id: string, totalParamsB: number, modelId: string): st
 }
 
 const SPEED_ROWS: [string, string, string, string, string][] = [
-  ['under 5', 'slower than reading', 'unusable', 'unusable', 'over 6.5 min'],
-  ['5-10', 'about reading speed', 'sluggish', 'very slow', '3.3-6.7 min'],
-  ['10-20', 'comfortable', 'usable', 'slow, turns add up', '1.7-3.3 min'],
-  ['20-40', 'snappy', 'good', 'workable', '50 s - 1.7 min'],
-  ['40-80', 'faster than you read', 'great', 'good', '25-50 s'],
-  ['80+', 'no visible gain', 'instant', 'best; prefill now limits', 'under 25 s'],
+  ['under 5', 'slower than reading', 'unusable', 'over 100 s', 'over 6.5 min'],
+  ['5-10', 'about reading speed', 'sluggish', '50-100 s', '3.3-6.7 min'],
+  ['10-20', 'comfortable', 'usable', '25-50 s', '1.7-3.3 min'],
+  ['20-40', 'snappy', 'good', '12-25 s', '50 s - 1.7 min'],
+  ['40-80', 'faster than you read', 'great', '6-12 s', '25-50 s'],
+  ['80+', 'no visible gain', 'instant', 'under 6 s', 'under 25 s'],
 ]
 
 const QUANT_ROWS: [string, string, string, string][] = [
@@ -108,7 +107,7 @@ export function GuideSection() {
         and the <a href="https://www.nngroup.com/articles/response-times-3-important-limits/">0.1 s / 1 s / 10 s response-time limits</a>.
       </p>
       <div class="seo-table"><table>
-        <thead><tr><th>tok/s</th><th>Chat</th><th>Coding help</th><th>Agentic coding</th><th>2K-token thinking</th></tr></thead>
+        <thead><tr><th>tok/s</th><th>Chat</th><th>Coding help</th><th>500-token agent reply</th><th>2K-token thinking</th></tr></thead>
         <tbody>{SPEED_ROWS.map(r => <tr key={r[0]}>{r.map((x, i) => <td key={i}>{x}</td>)}</tr>)}</tbody>
       </table></div>
       <h3>Time to first token</h3>
@@ -123,7 +122,7 @@ export function GuideSection() {
         Agents don't read it all at once: the first step sends the system prompt and tool definitions (about 10-25K tokens),
         and each later step adds a few thousand tokens of file contents or tool output. The runtime keeps the earlier context cached,
         so a step only processes the new tokens, but generation still slows as the context grows (an RTX PRO 6000 drops
-        from about 200 to 38 tok/s at 256K). Losing the cache, for example after the agent compacts its history, means reading the whole context again. Below 256K, agents have to compact or drop history more often.
+        from about 200 to 38 tok/s at 256K). Losing the cache, for example after the agent compacts its history, means reading the whole context again. Below 256K, agents have to compact or drop history more often. The app rates agentic coding by the first step: reading a 20K-token starting context and writing a 500-token reply. Under 10 s is great, under 20 s good, under 45 s workable, under 90 s slow.
         <strong> Document summarization and RAG</strong> wait roughly prompt tokens ÷ prefill speed before the first word.
         Macs and Strix Halo generate well for their price but prefill slowly; discrete NVIDIA cards prefill several times faster.
         <strong> Reasoning models</strong> think in hidden tokens first, so their thinking time acts like extra wait before the answer.
