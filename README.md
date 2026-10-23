@@ -83,7 +83,7 @@ Built with [Vite](https://vite.dev), [Preact](https://preactjs.com) and TypeScri
 ## Limitations
 
 - **Clusters are projected.** Multi-device speeds scale a single-device estimate by per-link factors calibrated from a handful of published runs; most of those runs used engine-native formats (MLX, NVFP4, AWQ), not GGUF.
-- **Mac memory** assumes the default macOS GPU limit (about 75% of unified memory). Raising it with `sysctl` fits bigger models; the app says how much.
+- **Mac memory** assumes the default macOS GPU limit (about 75% of unified memory). The hardware menu can switch to a raised limit (total minus 8 GB, set with `sudo sysctl iogpu.wired_limit_mb`), which resets on reboot.
 - **M5 prompt processing** assumes an engine that uses the Metal 4 tensor API, as current llama.cpp does. Builds without it, such as some LM Studio runtimes, can process prompts about half as fast.
 - **Estimates, not guarantees.** Drivers, engine versions, flash attention, power limits and thermals can all move real numbers by 10–30%.
 - **Projected numbers** for unreleased hardware will be replaced with measurements as they appear.

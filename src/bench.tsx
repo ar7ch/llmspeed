@@ -3,7 +3,7 @@
 // quantization costs some of it (see the quant notes).
 import { Component } from 'preact'
 import { BENCHES, HW, MODELS, type Bench, isVendorScore, nativeLowBit, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
-import { calc, fmt, type CalcResult, type KvQ } from './calc'
+import { calc, fmt, type CalcResult, type Opts } from './calc'
 
 const ACCENT = 'oklch(0.62 0.17 30)'
 
@@ -20,12 +20,12 @@ const VENDOR = "self-reported by the model's maker, not an independent run"
 /** scores keep their published precision (89.2, not 89) */
 export const fmtScore = (x: number) => x.toFixed(1).replace(/\.0$/, '')
 
-interface Props { hw: Hw; n: number; bench: string; setBench: (id: string) => void; floor: number; setFloor: (f: number) => void; ctx: number; model: string; pick: (m: Model, q: Quant) => void; setHw: (hw: Hw, n: number) => void; kvq: KvQ }
+interface Props { hw: Hw; n: number; bench: string; setBench: (id: string) => void; floor: number; setFloor: (f: number) => void; ctx: number; model: string; pick: (m: Model, q: Quant) => void; setHw: (hw: Hw, n: number) => void; opts: Opts }
 interface St { sort: 'score' | 'speed'; hover: string | null }
 
 /** the quant to run: the largest Q4 that fits, else the largest that fits, else the smallest */
-function bestRun(hw: Hw, n: number, m: Model, ctx: number, kvq: KvQ): { q: Quant; c: CalcResult } {
-  const all = quantsFor(m).map(q => ({ q, c: calc(hw, m, q, ctx, n, kvq) }))
+function bestRun(hw: Hw, n: number, m: Model, ctx: number, opts: Opts): { q: Quant; c: CalcResult } {
+  const all = quantsFor(m).map(q => ({ q, c: calc(hw, m, q, ctx, n, opts) }))
   const fits = all.filter(x => x.c.fit === 'fits')
   const q4 = fits.filter(x => /q4|mxfp4/.test(x.q.id))
   return q4[q4.length - 1] ?? fits[fits.length - 1] ?? all.find(x => x.c.fit === 'partial') ?? all[0]
@@ -56,11 +56,11 @@ export interface Ranked { m: Model; s: number; ok: boolean; q: Quant; c: CalcRes
  *  score that fits and still runs at the speed floor (`ok`), else the best one that fits at all.
  *  Quants within 2.5% of the best adjusted score count as equal and the fastest wins, so Q4 beats
  *  a 2x slower Q8 or FP16. Models that don't fit are left out. */
-export function rankModels(hw: Hw, n: number, ctx: number, b: Bench, floor: number, kvq: KvQ = 'f16'): Ranked[] {
+export function rankModels(hw: Hw, n: number, ctx: number, b: Bench, floor: number, settings?: Opts): Ranked[] {
   return CURRENT.flatMap(m => {
     const s = scoresOf(m.id)[b.id] as number | undefined
     if (typeof s !== 'number') return []
-    const opts = quantsFor(m).map(q => ({ q, c: calc(hw, m, q, ctx, n, kvq), adj: adjust(s, quantKeep(q, m), b) })).filter(x => x.c.fit === 'fits')
+    const opts = quantsFor(m).map(q => ({ q, c: calc(hw, m, q, ctx, n, settings), adj: adjust(s, quantKeep(q, m), b) })).filter(x => x.c.fit === 'fits')
     const choose = (xs: typeof opts) => {
       const top = Math.max(...xs.map(x => x.adj))
       // the window is 2.5% of the score above Elo's 1000 floor (or above 0 for percentages)
@@ -75,10 +75,10 @@ export function rankModels(hw: Hw, n: number, ctx: number, b: Bench, floor: numb
 export class BenchChart extends Component<Props, St> {
   state: St = { sort: 'score', hover: null }
 
-  render({ hw, n, bench, setBench, floor, setFloor, ctx, model, pick, setHw, kvq }: Props, { sort, hover }: St) {
+  render({ hw, n, bench, setBench, floor, setFloor, ctx, model, pick, setHw, opts }: Props, { sort, hover }: St) {
     const b = BENCHES.find(x => x.id === bench)
     if (!b) return null
-    const rows = CURRENT.map(m => ({ m, s: scoresOf(m.id)[b.id] as number | undefined, ...bestRun(hw, n, m, ctx, kvq) }))
+    const rows = CURRENT.map(m => ({ m, s: scoresOf(m.id)[b.id] as number | undefined, ...bestRun(hw, n, m, ctx, opts) }))
     // speed sort: runnable models by tok/s, then the ones that don't fit, by score
     const tps = (r: { c: CalcResult }) => r.c.fit === 'no' ? -1 : r.c.base
     const scored = rows.filter(r => typeof r.s === 'number').sort((x, y) => (sort === 'speed' ? tps(y) - tps(x) : 0) || y.s! - x.s!)
@@ -87,7 +87,7 @@ export class BenchChart extends Component<Props, St> {
     // Elo bars start near the lowest score, otherwise every bar looks the same length
     const axisMin = b.axis === 'elo' ? Math.floor((lo - 60) / 50) * 50 : 0
     const max = b.unit === '%' ? 100 : b.axis === 'elo' ? hi + 20 : hi * 1.1
-    const fitting = rankModels(hw, n, ctx, b, floor, kvq)
+    const fitting = rankModels(hw, n, ctx, b, floor, opts)
     const picks = fitting.filter(x => x.ok).sort((x, y) => y.adj - x.adj).slice(0, 3)
     // the best model that fits but misses the floor, when it would have made the top three
     const slower = fitting.filter(x => !x.ok && (picks.length < 3 || x.adj > picks[picks.length - 1].adj)).sort((x, y) => y.adj - x.adj)[0]
@@ -169,9 +169,9 @@ export class BenchChart extends Component<Props, St> {
         </div>
         {b.axis === 'elo' && <p style="font-size:12px; color:var(--c-text-muted); margin:8px 0 0; line-height:1.5">Bars start at {axisMin} Elo so differences are visible; a 50-point gap means the higher model wins about 57% of votes.</p>}
         {missing.length > 0 && <p style="font-size:12px; color:var(--c-text-muted); margin:8px 0 0; line-height:1.5">No published {b.short} score: {missing.map(r => r.m.name).join(', ')}.</p>}
-        {macLimitNote(hw, n) && (() => {
-          const more = scored.filter(r => r.c.fit === 'no' && quantsFor(r.m).some(q => calc(hw, r.m, q, ctx, n, kvq).total <= macRaisedUsable(hw, n))).length
-          return <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">{macLimitNote(hw, n)}{more > 0 && ` That would let ${more} more model${more > 1 ? 's' : ''} here fit.`}</p>
+        {macLimitNote(hw, n, opts.macRaised) && (() => {
+          const more = scored.filter(r => r.c.fit === 'no' && quantsFor(r.m).some(q => calc(hw, r.m, q, ctx, n, opts).total <= macRaisedUsable(hw, n))).length
+          return <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">{macLimitNote(hw, n, opts.macRaised)}{!opts.macRaised && more > 0 && ` That would let ${more} more model${more > 1 ? 's' : ''} here fit.`}</p>
         })()}
         <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Showing models and benchmark editions released in 2026; {MODELS.length - CURRENT.length} older models are hidden.</p>
         <p style="font-size:12px; color:var(--c-text-muted); margin:6px 0 0; line-height:1.5">Scores come from Artificial Analysis, LMArena, benchmark leaderboards and model makers, at full precision; * marks a score {VENDOR}. Quantization lowers them a little at Q4 and a lot below Q3 on small models.</p>

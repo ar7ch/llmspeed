@@ -1,4 +1,4 @@
-import { coeffs, combo, decodeEff, handPrefill, linkFor, LONG_CTX, OFFLOAD, prefillMult, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
+import { coeffs, combo, macUsable, decodeEff, handPrefill, linkFor, LONG_CTX, OFFLOAD, prefillMult, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
 
 export type Fit = 'fits' | 'partial' | 'no'
 export type Conf = 'measured' | 'derived' | 'projected' | null
@@ -6,6 +6,9 @@ export type Conf = 'measured' | 'derived' | 'projected' | null
 export type KvQ = 'f16' | 'q8_0' | 'q4_0'
 /** cache size relative to f16 (q8_0 and q4_0 store 8.5 and 4.5 bits per value) */
 export const KV_BYTES: Record<KvQ, number> = { f16: 1, q8_0: 8.5 / 16, q4_0: 4.5 / 16 }
+/** settings that apply to every setup: cache precision, and whether Macs run with the GPU memory limit raised */
+export interface Opts { kvq: KvQ; macRaised: boolean }
+export const DEFAULT_OPTS: Opts = { kvq: 'f16', macRaised: false }
 
 export interface CalcResult {
   /** weight memory, GB */
@@ -39,7 +42,7 @@ export interface CalcResult {
   /** decode and prefill multipliers from clustering (1 for a single device) */
   decF: number
   preF: number
-  kvq: KvQ
+  opts: Opts
 }
 
 // NOTE: inferred, no source measured it: replicated embeddings, norms and runtime buffers per node
@@ -82,11 +85,12 @@ export const RUNTIME_GB = 0.6
 
 // NOTE: the cache type changes memory only; measured decode with a quantized cache is about
 // the same or slightly slower than f16, so speed is left as is
-export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, kvq: KvQ = 'f16'): CalcResult {
+export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, opts: Opts = DEFAULT_OPTS): CalcResult {
+  const { kvq } = opts
   const co = coeffs(hw.backend)
   const w = m.quants[q.id] ? m.quants[q.id].file_gb : m.total_params_b * (FALLBACK_BPP[q.id] ?? 2)
   const kv = Math.max(0.15, m.kv_gb_per_8k * KV_BYTES[kvq] * (ctx / 8192))
-  const usable = (hw.vendor === 'apple' ? hw.vram_gb * 0.75 : hw.vram_gb * 0.93) * (n > 1 ? n * CLUSTER_MEM_EFF : 1)
+  const usable = (hw.vendor === 'apple' ? macUsable(hw, opts.macRaised) : hw.vram_gb * 0.93) * (n > 1 ? n * CLUSTER_MEM_EFF : 1)
   const total = w + kv + RUNTIME_GB
   // clusters don't offload to system RAM: the model fits in pooled memory or doesn't run
   const fit: Fit = total <= usable ? 'fits'
@@ -160,7 +164,7 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1, kvq: KvQ = 
   const ttft = ctx / pre + (fit === 'partial' ? 1.2 : 0.3)
 
   if (fit === 'no') conf = null
-  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: fit === 'partial' ? co.decode_bw_eff : eff, aw, fromCombo, gpuShare, n, decF, preF, kvq }
+  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: fit === 'partial' ? co.decode_bw_eff : eff, aw, fromCombo, gpuShare, n, decF, preF, opts }
 }
 
 export function fmt(x: number): string {

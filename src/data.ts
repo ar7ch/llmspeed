@@ -234,8 +234,14 @@ export const clampNodes = (hw: Hw, n: unknown) => typeof n === 'number' && nodeC
  *  raises it, and leaving ~8 GB for the system is the usual setting. Per-device MB to set. */
 export const macRaisedLimitMb = (hw: Hw) => (hw.vram_gb - 8) * 1024
 export const macRaisedUsable = (hw: Hw, n: number) => (hw.vram_gb - 8) * (n > 1 ? n * 0.97 : 1)
+/** per-device GPU memory on a Mac: 75% by default, total - 8 GB with the limit raised (when that is more) */
+export const macUsable = (hw: Hw, raised: boolean) => raised ? Math.max(hw.vram_gb * 0.75, hw.vram_gb - 8) : hw.vram_gb * 0.75
+/** raising the limit gains memory only above 32 GB */
+export const macCanRaise = (hw: Hw) => hw.vendor === 'apple' && hw.vram_gb - 8 > hw.vram_gb * 0.75
 /** empty for non-Macs, and when raising the limit gains nothing: at 32 GB and below, total - 8 GB is under the 75% default */
-export const macLimitNote = (hw: Hw, n: number) => hw.vendor !== 'apple' || hw.vram_gb - 8 <= hw.vram_gb * 0.75 ? '' :
+export const macLimitNote = (hw: Hw, n: number, raised = false) => !macCanRaise(hw) ? '' : raised ?
+  `Assumes the macOS GPU memory limit is raised with sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(hw)}${n > 1 ? ' on each Mac' : ''}, ` +
+  `leaving about 8 GB for the system. The setting resets on reboot.` :
   `Macs: macOS lets the GPU use about 75% of unified memory by default, which is what these numbers assume. ` +
   `Running sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(hw)}${n > 1 ? ' on each Mac' : ''} raises it to leave about 8 GB for the system, ` +
   `giving about ${Math.round(macRaisedUsable(hw, n))} GB usable here. The setting resets on reboot.`

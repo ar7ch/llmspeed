@@ -1,6 +1,6 @@
 import { Component, type ComponentChild } from 'preact'
-import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, isVendorScore, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
-import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ } from './calc'
+import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, macCanRaise, macUsable, BENCHES, scoresOf, isVendorScore, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
+import { calc, fmt, KV_BYTES, RUNTIME_GB, type CalcResult, type Fit, type KvQ, type Opts } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
 import { BenchChart, fmtScore, rankModels } from './bench'
@@ -44,6 +44,8 @@ interface St {
   floor: number
   /** context cache precision, applied to every setup */
   kvq: KvQ
+  /** Macs run with the GPU memory limit raised to total - 8 GB */
+  macRaised: boolean
   lanes: LaneSt[]; racePrompt: string; shared: boolean; dark: boolean
   feelPhase: 'type' | 'hold' | 'erase'; feelN: number; feelT: number
   isMobile: boolean; cfgOpen: boolean; composerH: number
@@ -69,7 +71,7 @@ export class App extends Component<{}, St> {
     const base: St = {
       cfgs: [{ hw: 'rtx-4090', model: 'llama-3.1-8b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
       streamText: '', liveTok: 0, prefillT: 0, breakdownOpen: false, history: [],
-      dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', floor: 10, kvq: 'f16', bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
+      dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', floor: 10, kvq: 'f16', macRaised: false, bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
       // index.html picks the theme before first paint (saved choice, else system setting)
       dark: typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'),
       feelPhase: 'type', feelN: 0, feelT: 0,
@@ -94,6 +96,7 @@ export class App extends Component<{}, St> {
         if (cfgs.length) base.cfgs = cfgs
         const kv = qs.get('kv')
         if (kv && Object.keys(KV_BYTES).includes(kv)) base.kvq = kv as KvQ
+        if (qs.get('mac') === 'raised') base.macRaised = true
         const p = qs.get('preset')
         if (p !== null && PRESETS[+p]) base.preset = +p
         const t = qs.get('prompt')
@@ -328,7 +331,7 @@ export class App extends Component<{}, St> {
     track('run', { mode: s.cfgs.length > 1 ? 'race' : 'single', hw: s.cfgs.map(c => c.hw).join(','), n: s.cfgs.map(c => c.n ?? 1).join(','), model: s.cfgs.map(c => c.model).join(','), quant: s.cfgs.map(c => c.quant).join(','), prompt: s.custom !== null ? 'custom' : PRESETS[s.preset].label })
     const lanes: RunLane[] = s.cfgs.map(cfg => {
       const { hw, m, q, n } = this.resolve(cfg)
-      const c = calc(hw, m, q, ctx, n, this.state.kvq)
+      const c = calc(hw, m, q, ctx, n, this.opts())
       return { hw, m, q, c, norun: c.fit === 'no', acc: 0, i: 0, done: c.fit === 'no', streamStarted: false, liveTok: c.base, finishT: 0 }
     })
     if (lanes.every(l => l.c.fit === 'no')) return
@@ -435,6 +438,8 @@ export class App extends Component<{}, St> {
     }).catch(() => { })
   }
 
+  opts(): Opts { return { kvq: this.state.kvq, macRaised: this.state.macRaised } }
+
   share() {
     const s = this.state
     const q = new URLSearchParams()
@@ -443,6 +448,7 @@ export class App extends Component<{}, St> {
     q.set('quant', s.cfgs.map(c => c.quant).join(','))
     if (s.cfgs.some(c => (c.n ?? 1) > 1)) q.set('n', s.cfgs.map(c => c.n ?? 1).join(','))
     if (s.kvq !== 'f16') q.set('kv', s.kvq)
+    if (s.macRaised) q.set('mac', 'raised')
     if (s.custom !== null) q.set('prompt', s.custom.slice(0, 2000))
     else q.set('preset', String(s.preset))
     q.set('run', '1')
@@ -457,7 +463,7 @@ export class App extends Component<{}, St> {
 
   cfgRow(i: number) {
     const s = this.state, cfg = s.cfgs[i], { hw, m, q, n } = this.resolve(cfg), ctx = this.promptTokens()
-    const c = calc(hw, m, q, ctx, n, this.state.kvq)
+    const c = calc(hw, m, q, ctx, n, this.opts())
     const compare = this.isCompare()
     const setCfg = (patch: Partial<Cfg>) => this.setState(x => ({
       cfgs: x.cfgs.map((cc, j) => {
@@ -477,7 +483,7 @@ export class App extends Component<{}, St> {
     void fc
     // rank markers: the best-pick ranking for this setup and the chart's benchmark
     const bench = BENCHES.find(b => b.id === s.bench)
-    const ranked = bench ? rankModels(hw, n, ctx, bench, s.floor, s.kvq) : []
+    const ranked = bench ? rankModels(hw, n, ctx, bench, s.floor, this.opts()) : []
     const okRanked = ranked.filter(x => x.ok).sort((x, y) => y.adj - x.adj)
     const rankedOf = (mm: Model) => ranked.find(r => r.m.id === mm.id)
     // per-row estimates use the ranked quant when the model has one (that's what picking it
@@ -498,13 +504,13 @@ export class App extends Component<{}, St> {
     const ctxLabel = (t: number) => t >= 1048576 ? `${+(t / 1048576).toFixed(1)}M ctx` : `${Math.round(t / 1024)}K ctx`
     const rankKey = (mm: Model) => { const x = rankedOf(mm); return x ? (x.ok ? 2e6 : 1e6) + x.adj : 0 }
     // the dropdown's estimate for a model, at rowQuant
-    const mcalc = (mm: Model) => rankedOf(mm)?.c ?? calc(hw, mm, quantOf(rowQuant(mm)), ctx, n, s.kvq)
+    const mcalc = (mm: Model) => rankedOf(mm)?.c ?? calc(hw, mm, quantOf(rowQuant(mm)), ctx, n, this.opts())
     const score = (mm: Model) => scoresOf(mm.id)[s.bench] as number | undefined
     const sortBtn = (act: boolean) => `border-radius:99px; padding:3px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap; ${act ? 'background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)' : 'background:none; border:1px solid var(--c-border); color:var(--c-text-muted)'}`
     return {
       showPreset: i === 0, showBadge: compare, rowBadge: i ? 'B' : 'A',
       rowBadgeStyle: `width:20px; height:20px; border-radius:6px; background:${i ? 'var(--c-badge-b-bg)' : 'var(--c-bg-muted)'}; color:${i ? 'var(--c-badge-b)' : 'var(--c-text-sec)'}; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0`,
-      hwName: setupName(hw, n), modelName: m.name, quantName: q.label + (s.kvq === 'f16' ? '' : ` · KV ${s.kvq.toUpperCase()}`),
+      hwName: setupName(hw, n) + (s.macRaised && macCanRaise(hw) ? ' · raised limit' : ''), modelName: m.name, quantName: q.label + (s.kvq === 'f16' ? '' : ` · KV ${s.kvq.toUpperCase()}`),
       kvBtns: (['f16', 'q8_0', 'q4_0'] as KvQ[]).map(id => ({
         label: id.toUpperCase(),
         pick: (e: Event) => { e.stopPropagation(); this.setState({ kvq: id }) },
@@ -530,6 +536,12 @@ export class App extends Component<{}, St> {
         style: sortBtn(n === k),
       })),
       linkLabel: linkFor(hw).label,
+      showMacLimit: macCanRaise(hw),
+      macLimitBtns: ([[false, '75%'], [true, `raised ${Math.round(macUsable(hw, true))} GB`]] as [boolean, string][]).map(([v, label]) => ({
+        label,
+        pick: (e: Event) => { e.stopPropagation(); this.setState({ macRaised: v }) },
+        style: sortBtn(s.macRaised === v),
+      })),
       modelSortBtns: ([['best', 'Best'], ['pop', 'Popular'], ['params', 'Params'], ['size', 'Weights'], ['date', 'Newest'], ['speed', 'Speed'], ['score', BENCHES.find(b => b.id === s.bench)?.short ?? 'Score']] as [St['modelSort'], string][]).map(([id, label]) => ({
         label,
         pick: (e: Event) => { e.stopPropagation(); this.setState({ modelSort: id }) },
@@ -537,7 +549,7 @@ export class App extends Component<{}, St> {
       })),
       hwOpts: this.groupOpts(
         HW.filter(h => App.matches(s.hwQ, `${h.name} ${h.id}`)).sort((a, b) => s.hwSort === 'ram' ? b.vram_gb - a.vram_gb || a.popularity_rank - b.popularity_rank : a.popularity_rank - b.popularity_rank),
-        h => calc(h, m, q, ctx, clampNodes(h, n), s.kvq).fit,
+        h => calc(h, m, q, ctx, clampNodes(h, n), this.opts()).fit,
         h => ({ name: h.name, meta: `${h.vram_gb} GB${h.status === 'announced' ? ' · announced' : ''}`, sel: h.id === cfg.hw, pick: () => setCfg({ hw: h.id }) })),
       modelOpts: this.groupOpts(
         MODELS.filter(mm => App.matches(s.modelQ, `${mm.name} ${mm.id}`)).sort((a, b) => (s.modelSort === 'best' ? rankKey(b) - rankKey(a)
@@ -551,7 +563,7 @@ export class App extends Component<{}, St> {
         mm => ({ name: mm.name, meta: [s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
           : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
           : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!) + (isVendorScore(mm.id, s.bench) ? '*' : '')) : `${mm.total_params_b} B`, ctxLabel(mm.context_max), releasedLabel(mm.id)].filter(Boolean).map(x => x.replace(/ /g, '\u00a0')).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
-      quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n, s.kvq).fit })).map(({ qq, fit }) => ({
+      quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n, this.opts()).fit })).map(({ qq, fit }) => ({
         name: qq.label, meta: [quantNote(qq.id, m.total_params_b, m.id), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
         fitColor: fit === 'no' ? fitColors.no : fit === 'partial' ? fitColors.partial : '',
         pick: () => setCfg({ quant: qq.id }),
@@ -602,19 +614,19 @@ export class App extends Component<{}, St> {
         ttft: c.fit === 'no' ? '—' : (c.ttft < 10 ? c.ttft.toFixed(2).replace(/0$/, '') : String(Math.round(c.ttft))) + ' s',
         confLabel: conf[0], confDotStyle: `width:8px; height:8px; border-radius:50%; background:${conf[1]}; display:inline-block`,
         showTips: i === 0 && !compare,
-        workloads: !compare && c.fit !== 'no' ? workloads(c, x => calc(r._hw, r._m, r._q, x, c.n, c.kvq), r._m.context_max) : [],
+        workloads: !compare && c.fit !== 'no' ? workloads(c, x => calc(r._hw, r._m, r._q, x, c.n, c.opts), r._m.context_max) : [],
       }
     })
     const mkRows = (r: ReturnType<App['cfgRow']>) => {
       const c = r._c, m = r._m, hw = r._hw, q = r._q
       return c.fit === 'no' ? [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },
-        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k at F16${c.kvq === 'f16' ? '' : `, × ${KV_BYTES[c.kvq].toFixed(2)} at ${c.kvq.toUpperCase()}`})`, v: `${c.kv.toFixed(1)} GB` },
-        { n: '3', f: `Total with ${RUNTIME_GB} GB runtime vs usable memory (${hw.vendor === 'apple' ? '75% of unified' : '93% of VRAM'}${c.n > 1 ? `, pooled over ${c.n} devices` : ''})`, v: `${c.total.toFixed(1)} / ${c.usable.toFixed(1)} GB` },
+        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k at F16${c.opts.kvq === 'f16' ? '' : `, × ${KV_BYTES[c.opts.kvq].toFixed(2)} at ${c.opts.kvq.toUpperCase()}`})`, v: `${c.kv.toFixed(1)} GB` },
+        { n: '3', f: `Total with ${RUNTIME_GB} GB runtime vs usable memory (${hw.vendor === 'apple' ? (c.opts.macRaised && macCanRaise(hw) ? 'total minus 8 GB, limit raised' : '75% of unified') : '93% of VRAM'}${c.n > 1 ? `, pooled over ${c.n} devices` : ''})`, v: `${c.total.toFixed(1)} / ${c.usable.toFixed(1)} GB` },
         { n: '4', f: 'Result', v: "won't run" },
       ] : [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },
-        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k at F16${c.kvq === 'f16' ? '' : `, × ${KV_BYTES[c.kvq].toFixed(2)} at ${c.kvq.toUpperCase()}`})`, v: `${c.kv.toFixed(1)} GB` },
+        { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k at F16${c.opts.kvq === 'f16' ? '' : `, × ${KV_BYTES[c.opts.kvq].toFixed(2)} at ${c.opts.kvq.toUpperCase()}`})`, v: `${c.kv.toFixed(1)} GB` },
         { n: '3', f: `Fit: ${c.total.toFixed(1)} GB needed vs ${c.usable.toFixed(1)} GB usable`, v: c.fit === 'fits' ? 'fits' : 'partial offload' },
         { n: '4', f: c.fit === 'partial'
           ? `Decode: hybrid offload — ${Math.round(c.gpuShare * 100)}% of active weights read at GPU speed (${hw.bandwidth_gbs} GB/s × ${c.eff}), ${Math.round((1 - c.gpuShare) * 100)}% at system-RAM speed (~${OFFLOAD.ram_bw_gbs} GB/s)`
@@ -628,7 +640,7 @@ export class App extends Component<{}, St> {
     }
     const breakdownSecs = rows.map((r, i) => ({ showLabel: compare, label: `${i ? 'B' : 'A'} — ${setupName(r._hw, r._c.n)} · ${r._m.name} · ${r._q.label}`, rows: mkRows(r),
       sources: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.sources ?? [] : [],
-      macNote: r._hw.vendor === 'apple' ? macLimitNote(r._hw, r._c.n) : '',
+      macNote: r._hw.vendor === 'apple' ? macLimitNote(r._hw, r._c.n, r._c.opts.macRaised) : '',
       tested: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.tested?.join(', ') ?? '' : '',
       ran: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.ran ?? '' : '',
       runs: clusterRuns(r._hw.id, r._m.id).map(x => ({ label: `${x.n}× · ${x.engine} · ${x.link} · ${x.quant}${x.tested ? ` (tested: ${x.tested})` : ''}`, v: `${fmt(x.gen_tps)} tok/s`, href: x.source })) }))
@@ -638,7 +650,7 @@ export class App extends Component<{}, St> {
       const curGb = m.quants[q.id] ? m.quants[q.id].file_gb : Infinity
       for (const alt of quantsFor(m)) {
         if (m.quants[alt.id].file_gb >= curGb) continue
-        const ac = calc(hw, m, alt, ctx, n, s.kvq)
+        const ac = calc(hw, m, alt, ctx, n, this.opts())
         if (ac.fit === 'fits') { suggShow = true; suggQ = alt.id; suggLabel = `Switch to ${alt.label} — fits, ~${fmt(ac.lo)}–${fmt(ac.hi)} tok/s`; break }
       }
     }
@@ -751,7 +763,7 @@ export class App extends Component<{}, St> {
       showStarCta: s.phase === 'done',
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
       wontRun: !compare && c0.fit === 'no' && !busy && !(collapse && s.cfgOpen),
-      wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${r._hw.vendor === 'apple' && c0.total <= macRaisedUsable(r._hw, c0.n) ? `It does fit if you raise macOS's GPU memory limit (sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(r._hw)}${c0.n > 1 ? ' on each Mac' : ''}). ` : ''}${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
+      wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${r._hw.vendor === 'apple' && c0.total <= macRaisedUsable(r._hw, c0.n) ? `It fits with macOS's GPU memory limit raised: pick "raised" under GPU memory in the hardware menu, or run sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(r._hw)}${c0.n > 1 ? ' on each Mac' : ''}. ` : suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
       suggShow, suggLabel,
       applySugg: () => suggQ && this.setState(x => ({ cfgs: x.cfgs.map((cc, j) => j === 0 ? { ...cc, quant: suggQ! } : cc) })),
       tokHelp: 'Tokens generated per second. People read about 5 tok/s; 10–20 feels comfortable for chat, coding agents want 20+.',
@@ -889,7 +901,7 @@ export class App extends Component<{}, St> {
         </div>
         {v.heroMode && (() => {
           const { hw, n } = this.resolve(this.state.cfgs[0])
-          return <BenchChart hw={hw} n={n} bench={this.state.bench} setBench={b => this.setState({ bench: b })} floor={this.state.floor} setFloor={f => this.setState({ floor: f })} kvq={this.state.kvq} ctx={this.promptTokens()} model={this.state.cfgs[0].model}
+          return <BenchChart hw={hw} n={n} bench={this.state.bench} setBench={b => this.setState({ bench: b })} floor={this.state.floor} setFloor={f => this.setState({ floor: f })} opts={this.opts()} ctx={this.promptTokens()} model={this.state.cfgs[0].model}
             setHw={(h, n) => this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, hw: h.id, n } : c) }))}
             pick={(m, q) => { this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, model: m.id, quant: q.id } : c) })); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
         })()}
@@ -1025,6 +1037,10 @@ export class App extends Component<{}, St> {
                         {r.nodeBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
                         {r.nodeBtns.length > 1 && <span style="font-size:11px; color:var(--c-text-faint); padding:0 6px">via {r.linkLabel}</span>}
                       </div>
+                      {r.showMacLimit && <div style="display:flex; gap:4px; padding:0 4px 8px; flex-wrap:wrap; align-items:center">
+                        <span style="font-size:11px; color:var(--c-text-faint); padding:0 6px">GPU memory</span>
+                        {r.macLimitBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
+                      </div>}
                       {this.searchInput('hardware', r.hwQ, r.setHwQ)}
                       <div style="overflow-y:auto; display:flex; flex-direction:column">
                         {r.hwOpts.length === 0 && <div style="padding:10px; font-size:12.5px; color:var(--c-text-muted)">No hardware matches "{r.hwQ}"</div>}
