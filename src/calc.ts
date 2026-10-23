@@ -1,4 +1,4 @@
-import { coeffs, combo, OFFLOAD, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
+import { coeffs, combo, decodeEff, linkFor, OFFLOAD, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
 
 export type Fit = 'fits' | 'partial' | 'no'
 export type Conf = 'measured' | 'derived' | 'projected' | null
@@ -30,7 +30,15 @@ export interface CalcResult {
   fromCombo: boolean
   /** fraction of model weights resident on GPU (1 unless fit is partial) */
   gpuShare: number
+  /** number of devices in the setup */
+  n: number
+  /** decode and prefill multipliers from clustering (1 for a single device) */
+  decF: number
+  preF: number
 }
+
+// NOTE: inferred, no source measured it: replicated embeddings, norms and runtime buffers per node
+const CLUSTER_MEM_EFF = 0.97
 
 // Fallback bytes/param per quant, used only when a config references a quant the
 // model has no file for (e.g. a stale share link); real sizes come from app-data.
@@ -52,17 +60,20 @@ function comboPrefill(cb: ComboPred | undefined, ctx: number): number | null {
   return mids[n - 1]
 }
 
-export function calc(hw: Hw, m: Model, q: Quant, ctx: number): CalcResult {
+export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult {
   const co = coeffs(hw.backend)
   const w = m.quants[q.id] ? m.quants[q.id].file_gb : m.total_params_b * (FALLBACK_BPP[q.id] ?? 2)
   const kv = Math.max(0.15, m.kv_gb_per_8k * (ctx / 8192))
-  const usable = hw.vendor === 'apple' ? hw.vram_gb * 0.75 : hw.vram_gb * 0.93
+  const usable = (hw.vendor === 'apple' ? hw.vram_gb * 0.75 : hw.vram_gb * 0.93) * (n > 1 ? n * CLUSTER_MEM_EFF : 1)
   const total = w + kv + 0.6
+  // clusters don't offload to system RAM: the model fits in pooled memory or doesn't run
   const fit: Fit = total <= usable ? 'fits'
-    : (hw.vendor !== 'apple' && hw.form_factor !== 'server' && total <= usable * 2.4 ? 'partial' : 'no')
+    : (n === 1 && hw.vendor !== 'apple' && hw.form_factor !== 'server' && total <= usable * 2.4 ? 'partial' : 'no')
   const derate = Math.pow(co.ctx_derate_per_8k, ctx / 8192)
   const aw = w * (m.active_params_b / m.total_params_b)
   const cb = combo(hw.id, m.id, q.id)
+  const moe = m.active_params_b < m.total_params_b
+  const eff = decodeEff(hw.backend, moe)
 
   let lo: number, hi: number, conf: Conf, fromCombo = false
   if (cb && cb.gen_tps && cb.tier !== 'wont_run') {
@@ -71,7 +82,7 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number): CalcResult {
     conf = cb.tier
     fromCombo = true
   } else {
-    const b = (hw.bandwidth_gbs * co.decode_bw_eff / aw) * derate
+    const b = (hw.bandwidth_gbs * eff / aw) * derate
     lo = b * 0.85
     hi = b * 1.15
     conf = 'projected'
@@ -91,15 +102,27 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number): CalcResult {
     conf = 'projected'
     fromCombo = false
   }
+  // Cluster: start from the single-device speed with the whole model resident (a combo
+  // measured on one device, else the bandwidth formula) and scale by the link's factors.
+  let decF = 1, preF = 1
+  if (n > 1) {
+    const L = linkFor(hw)
+    const k = L.mode === 'tensor' ? Math.log2(n) : 1
+    decF = Math.pow(moe ? L.decode_moe : L.decode_dense, k)
+    preF = Math.pow(moe ? L.prefill_moe : L.prefill_dense, k)
+    lo *= decF
+    hi *= decF
+    conf = 'projected'
+  }
   if (hw.status === 'announced') conf = 'projected'
   const base = (lo + hi) / 2
 
-  let pre = comboPrefill(cb, ctx) ?? (hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)) * derate
+  let pre = (comboPrefill(cb, ctx) ?? (hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)) * derate) * preF
   if (fit === 'partial') pre *= 0.5
   const ttft = ctx / pre + (fit === 'partial' ? 1.2 : 0.3)
 
   if (fit === 'no') conf = null
-  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: co.decode_bw_eff, aw, fromCombo, gpuShare }
+  return { w, kv, usable, total, fit, base, lo, hi, pre, ttft, conf, eff: fit === 'partial' ? co.decode_bw_eff : eff, aw, fromCombo, gpuShare, n, decF, preF }
 }
 
 export function fmt(x: number): string {

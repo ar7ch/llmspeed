@@ -373,5 +373,62 @@
    "popularity_rank": 25,
    "pinned": false
   }
- ]
+ ],
+ "links": {
+  "tb5-rdma": {
+   "label": "Thunderbolt 5 RDMA",
+   "mode": "tensor",
+   "max_n": 4,
+   "decode_dense": 1.7,
+   "decode_moe": 1.4,
+   "prefill_dense": 1.5,
+   "prefill_moe": 1.2,
+   "source": "https://machinelearning.apple.com/research/mlx-distributed-inference"
+  },
+  "connectx7": {
+   "label": "ConnectX-7 200GbE",
+   "mode": "tensor",
+   "max_n": 4,
+   "decode_dense": 1.7,
+   "decode_moe": 1.25,
+   "prefill_dense": 1.5,
+   "prefill_moe": 1.2,
+   "source": "https://whitepapers.openzeka.com/papers/qwen3.6-27b-dgx-spark-scaling/"
+  },
+  "pcie": {
+   "label": "PCIe, one machine",
+   "mode": "tensor",
+   "max_n": 8,
+   "decode_dense": 1.6,
+   "decode_moe": 1.3,
+   "prefill_dense": 1.3,
+   "prefill_moe": 1.1,
+   "source": "https://computingforgeeks.com/build-dual-rtx-3090-llm/"
+  },
+  "ethernet-rpc": {
+   "label": "Ethernet (llama.cpp RPC)",
+   "mode": "layer",
+   "max_n": 4,
+   "decode_dense": 0.75,
+   "decode_moe": 0.75,
+   "prefill_dense": 1.0,
+   "prefill_moe": 1.0,
+   "source": "https://www.jeffgeerling.com/blog/2025/i-clustered-four-framework-mainboards-test-huge-llms"
+  }
+ },
+ "projected_decode_eff": {
+  "note": "Median of gen_tps \u00d7 active weight GB \u00f7 bandwidth over measured single-device combos in app-data.json (2026-10-17), split by dense/MoE. Backends with fewer than 5 measured rows per class fall back to the pipeline coefficient.",
+  "cuda": {
+   "dense": 0.521,
+   "moe": 0.363
+  },
+  "metal": {
+   "dense": 0.59,
+   "moe": 0.32
+  },
+  "rocm": {
+   "dense": 0.685,
+   "moe": 0.442
+  }
+ }
 }

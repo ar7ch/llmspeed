@@ -67,6 +67,19 @@ export interface ComboPred {
   prefill_tps: [number, number][] | null
 }
 
+/** how several identical devices are joined into one setup; factors are per doubling for
+ *  'tensor' (speed × f^log2 n) and flat for 'layer' (speed × f) */
+export interface Link {
+  label: string
+  mode: 'tensor' | 'layer'
+  max_n: number
+  decode_dense: number
+  decode_moe: number
+  prefill_dense: number
+  prefill_moe: number
+  source: string
+}
+
 interface AppData {
   prompt_presets: number[]
   hardware: Hw[]
@@ -75,6 +88,8 @@ interface AppData {
   offload?: OffloadCal
   /** keyed "hardware_id|model_id|quant" */
   combos: Record<string, ComboPred>
+  links?: Record<string, Link>
+  projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>>
 }
 
 // Hand-curated entries (new models, cluster setups) live in app-data.projected.json so a
@@ -85,6 +100,8 @@ const DATA: AppData = {
   ...(raw as unknown as AppData),
   hardware: merge((raw as unknown as AppData).hardware, EXTRA.hardware),
   models: merge((raw as unknown as AppData).models, EXTRA.models),
+  links: EXTRA.links,
+  projected_decode_eff: EXTRA.projected_decode_eff,
 }
 
 export const HW: Hw[] = [...DATA.hardware].sort((a, b) => a.popularity_rank - b.popularity_rank)
@@ -108,7 +125,31 @@ export function coeffs(backend: Backend): Coeffs {
   return DATA.coefficients[backend] ?? FALLBACK_COEFFS
 }
 
+/** decode bandwidth efficiency for the spec-formula path: measured-only and split by dense/MoE
+ *  where there's enough data, since the pipeline's blended coefficient underrates dense models */
+export function decodeEff(backend: Backend, moe: boolean): number {
+  const e = DATA.projected_decode_eff?.[backend]
+  return e ? (moe ? e.moe : e.dense) : coeffs(backend).decode_bw_eff
+}
+
 export const OFFLOAD: OffloadCal = DATA.offload ?? { ram_bw_gbs: 55, err_q50: 1.5, err_q80: 2.0, n_rows: 0 }
+
+/** the interconnect a multi-device setup of this hardware uses */
+export function linkFor(hw: Hw): Link {
+  const L = DATA.links!
+  if (hw.vendor === 'apple') return L['tb5-rdma']
+  if (hw.id.startsWith('dgx-spark')) return L['connectx7']
+  if (hw.form_factor === 'desktop' || hw.form_factor === 'server') return hw.vendor === 'cpu' ? L['ethernet-rpc'] : L['pcie']
+  return L['ethernet-rpc']
+}
+
+/** node counts the hardware's link supports, 1 first */
+export const nodeCounts = (hw: Hw) => [1, 2, 4, 8].filter(n => n <= linkFor(hw).max_n)
+
+/** a node count this hardware supports, else 1 (for share links and hardware switches) */
+export const clampNodes = (hw: Hw, n: unknown) => typeof n === 'number' && nodeCounts(hw).includes(n) ? n : 1
+
+export const setupName = (hw: Hw, n: number) => n > 1 ? `${n}× ${hw.name}` : hw.name
 
 export function combo(hwId: string, modelId: string, quantId: string): ComboPred | undefined {
   return DATA.combos[`${hwId}|${modelId}|${quantId}`]

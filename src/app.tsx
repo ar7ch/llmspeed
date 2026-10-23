@@ -1,5 +1,5 @@
 import { Component, type ComponentChild } from 'preact'
-import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
+import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type Fit } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
@@ -29,7 +29,8 @@ const RUNPOD_HW = new Set(['rtx-3090', 'rtx-4090', 'rtx-5080', 'rtx-5090', 'rtx-
 const RUNPOD_LOGO = <svg class="rp-logo" viewBox="8 4 179 198" width={12} height={12} fill="currentColor" aria-hidden><path fill-rule="evenodd" clip-rule="evenodd" d="M170.04 163.76C180.216 157.899 186.485 147.067 186.485 135.344L186.485 70.656C186.485 58.9334 180.216 48.1013 170.04 42.24L113.887 9.89597C103.71 4.03467 91.1731 4.03468 80.997 9.89598L24.8432 42.24C14.6671 48.1013 8.39844 58.9334 8.39844 70.656L8.39844 135.344C8.39844 147.067 14.6672 157.899 24.8432 163.76L80.997 196.104C91.1731 201.965 103.711 201.965 113.887 196.104L170.04 163.76ZM170.04 135.344C170.04 141.205 166.906 146.621 161.818 149.552L132.428 166.48C129.838 167.972 128.543 168.718 127.48 168.607C126.553 168.51 125.711 168.025 125.163 167.272C124.535 166.41 124.535 164.918 124.535 161.934L124.535 128.078C124.535 122.217 127.669 116.801 132.757 113.87L148.493 104.806C150.654 103.562 151.734 102.939 152.52 102.068C153.214 101.298 153.739 100.39 154.058 99.404C154.42 98.2895 154.418 97.0449 154.413 94.5556L154.412 93.8078C154.405 90.0844 154.402 88.2227 153.616 87.1465C152.931 86.2077 151.879 85.6029 150.721 85.4821C149.393 85.3436 147.777 86.2745 144.545 88.1362L124.535 99.662C114.359 105.523 108.09 116.355 108.09 128.078V177.704C108.09 179.434 107.165 181.031 105.664 181.896C100.576 184.827 94.3074 184.827 89.2194 181.896L33.0656 149.552C27.9776 146.621 24.8432 141.205 24.8432 135.344L24.8432 102.001C24.8432 99.0167 24.8432 97.5248 25.4713 96.6622C26.0192 95.9099 26.8613 95.4249 27.7883 95.3277C28.8511 95.2162 30.1462 95.9621 32.7366 97.454L61.518 114.031C66.6059 116.961 69.7403 122.378 69.7403 128.239L69.7403 145.503C69.7403 147.992 69.7403 149.237 70.1037 150.35C70.4253 151.336 70.9512 152.243 71.6472 153.012C72.4339 153.881 73.5155 154.502 75.6786 155.743L76.3283 156.115C79.5638 157.971 81.1816 158.9 82.5087 158.759C83.6663 158.636 84.7175 158.029 85.4012 157.089C86.1851 156.012 86.1851 154.15 86.1851 150.426L86.1851 128.239C86.1851 116.516 79.9164 105.684 69.7403 99.8227L27.7149 75.6181C25.9379 74.5947 24.8432 72.7031 24.8432 70.656C24.8432 64.7947 27.9775 59.3786 33.0656 56.448L89.2194 24.104C94.3074 21.1733 100.576 21.1733 105.664 24.104L134.734 40.8481C137.325 42.3402 138.62 43.0862 139.055 44.0601C139.434 44.9096 139.434 45.8798 139.055 46.7293C138.62 47.7032 137.325 48.4492 134.734 49.9413L105.21 66.9473C100.121 69.8779 93.8528 69.8779 88.7647 66.9473L72.2226 57.4192C70.576 56.4708 69.7527 55.9965 68.8765 55.8061C68.1011 55.6376 67.2992 55.6309 66.5211 55.7864C65.6419 55.962 64.8107 56.4224 63.1483 57.343L61.0974 58.4789C57.7726 60.3202 56.1103 61.2409 55.5478 62.4623C55.0574 63.5273 55.0471 64.7507 55.5195 65.8238C56.0613 67.0545 57.7079 68.0029 61.0011 69.8997L80.5424 81.1553C90.7184 87.0166 103.256 87.0166 113.432 81.1553L156.327 56.448C158.026 55.4695 160.119 55.4695 161.818 56.448C166.906 59.3786 170.04 64.7947 170.04 70.656V135.344Z" /></svg>
 const fmtStars = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : `${n}`
 
-interface Cfg { hw: string; model: string; quant: string }
+/** n: devices in the setup (absent = 1) */
+interface Cfg { hw: string; model: string; quant: string; n?: number }
 interface Msg { role: 'user' | 'assistant'; text: string; meta?: string; hw?: string }
 interface LaneSt { phase: 'norun' | 'prefill' | 'stream' | 'done'; prefillT: number; text: string; liveTok: number; finishT: number; winner: boolean }
 interface St {
@@ -72,12 +73,13 @@ export class App extends Component<{}, St> {
       const qs = new URLSearchParams(location.search)
       if (qs.has('hw') || qs.has('model')) {
         const hws = (qs.get('hw') || '').split(',').map(canonHw), models = (qs.get('model') || '').split(',').map(canonModel), quants = (qs.get('quant') || '').split(',').map(canonQuant)
+        const ns = (qs.get('n') || '').split(',').map(Number)
         const n = Math.min(2, Math.max(hws.length, models.length, quants.length))
         const cfgs: Cfg[] = []
         for (let i = 0; i < n; i++) {
-          const cfg = { hw: hws[i] || hws[0], model: models[i] || models[0], quant: quants[i] || quants[0] }
-          const cm = MODELS.find(m => m.id === cfg.model)
-          if (HW.some(h => h.id === cfg.hw) && cm && cm.quants[cfg.quant]) cfgs.push(cfg)
+          const cfg: Cfg = { hw: hws[i] || hws[0], model: models[i] || models[0], quant: quants[i] || quants[0] }
+          const cm = MODELS.find(m => m.id === cfg.model), ch = HW.find(h => h.id === cfg.hw)
+          if (ch && cm && cm.quants[cfg.quant]) cfgs.push({ ...cfg, n: clampNodes(ch, ns[i] || ns[0]) })
         }
         if (cfgs.length) base.cfgs = cfgs
         const p = qs.get('preset')
@@ -154,7 +156,7 @@ export class App extends Component<{}, St> {
   }
 
   resolve(cfg: Cfg) {
-    return { hw: HW.find(h => h.id === cfg.hw)!, m: MODELS.find(m => m.id === cfg.model)!, q: quantOf(cfg.quant) }
+    return { hw: HW.find(h => h.id === cfg.hw)!, m: MODELS.find(m => m.id === cfg.model)!, q: quantOf(cfg.quant), n: cfg.n ?? 1 }
   }
   promptTokens() {
     const s = this.state
@@ -239,8 +241,9 @@ export class App extends Component<{}, St> {
         const patch: Partial<St> = {}
         if (Array.isArray(d.c) && d.c.length) {
           const cf = (d.c as Cfg[])
-            .map(x => ({ hw: canonHw(x.hw), model: canonModel(x.model), quant: canonQuant(x.quant) }))
+            .map(x => ({ hw: canonHw(x.hw), model: canonModel(x.model), quant: canonQuant(x.quant), n: x.n }))
             .filter(x => { const cm = MODELS.find(m => m.id === x.model); return HW.some(h => h.id === x.hw) && cm && cm.quants[x.quant] })
+            .map(x => ({ ...x, n: clampNodes(HW.find(h => h.id === x.hw)!, x.n) }))
             .slice(0, 2)
           if (cf.length) patch.cfgs = cf
         }
@@ -303,10 +306,10 @@ export class App extends Component<{}, St> {
     const replayH = this._replayHistory
     this._replayHistory = null
     const s = this.state, ctx = this.promptTokens()
-    track('run', { mode: s.cfgs.length > 1 ? 'race' : 'single', hw: s.cfgs.map(c => c.hw).join(','), model: s.cfgs.map(c => c.model).join(','), quant: s.cfgs.map(c => c.quant).join(','), prompt: s.custom !== null ? 'custom' : PRESETS[s.preset].label })
+    track('run', { mode: s.cfgs.length > 1 ? 'race' : 'single', hw: s.cfgs.map(c => c.hw).join(','), n: s.cfgs.map(c => c.n ?? 1).join(','), model: s.cfgs.map(c => c.model).join(','), quant: s.cfgs.map(c => c.quant).join(','), prompt: s.custom !== null ? 'custom' : PRESETS[s.preset].label })
     const lanes: RunLane[] = s.cfgs.map(cfg => {
-      const { hw, m, q } = this.resolve(cfg)
-      const c = calc(hw, m, q, ctx)
+      const { hw, m, q, n } = this.resolve(cfg)
+      const c = calc(hw, m, q, ctx, n)
       return { hw, m, q, c, norun: c.fit === 'no', acc: 0, i: 0, done: c.fit === 'no', streamStarted: false, liveTok: c.base, finishT: 0 }
     })
     if (lanes.every(l => l.c.fit === 'no')) return
@@ -364,7 +367,7 @@ export class App extends Component<{}, St> {
       st.phase = 'done'
       if (!this.isCompare()) {
         const l = lanes[0]
-        const meta = `${l.hw.name} · ${l.m.name} · ${l.q.label} · ${fmt(l.c.base)} tok/s · TTFT ${l.c.ttft < 10 ? l.c.ttft.toFixed(1) : Math.round(l.c.ttft)}s`
+        const meta = `${setupName(l.hw, l.c.n)} · ${l.m.name} · ${l.q.label} · ${fmt(l.c.base)} tok/s · TTFT ${l.c.ttft < 10 ? l.c.ttft.toFixed(1) : Math.round(l.c.ttft)}s`
         st.history = [...this.state.history, { role: 'assistant' as const, text: words.join(' '), meta, hw: l.hw.id }]
         st.streamText = ''
       }
@@ -380,7 +383,7 @@ export class App extends Component<{}, St> {
       const s = this.state
       if (s.streamText) {
         const l = this.runCfg!.lanes[0]
-        const meta = `${l.hw.name} · ${l.m.name} · ${l.q.label} · ${fmt(l.c.base)} tok/s · stopped`
+        const meta = `${setupName(l.hw, l.c.n)} · ${l.m.name} · ${l.q.label} · ${fmt(l.c.base)} tok/s · stopped`
         this.setState(x => ({ phase: 'done' as const, history: [...x.history, { role: 'assistant' as const, text: x.streamText, meta, hw: l.hw.id }], streamText: '' }))
       } else this.setState({ phase: 'idle' })
     }
@@ -419,6 +422,7 @@ export class App extends Component<{}, St> {
     q.set('hw', s.cfgs.map(c => c.hw).join(','))
     q.set('model', s.cfgs.map(c => c.model).join(','))
     q.set('quant', s.cfgs.map(c => c.quant).join(','))
+    if (s.cfgs.some(c => (c.n ?? 1) > 1)) q.set('n', s.cfgs.map(c => c.n ?? 1).join(','))
     if (s.custom !== null) q.set('prompt', s.custom.slice(0, 2000))
     else q.set('preset', String(s.preset))
     q.set('run', '1')
@@ -432,13 +436,14 @@ export class App extends Component<{}, St> {
   }
 
   cfgRow(i: number) {
-    const s = this.state, cfg = s.cfgs[i], { hw, m, q } = this.resolve(cfg), ctx = this.promptTokens()
-    const c = calc(hw, m, q, ctx)
+    const s = this.state, cfg = s.cfgs[i], { hw, m, q, n } = this.resolve(cfg), ctx = this.promptTokens()
+    const c = calc(hw, m, q, ctx, n)
     const compare = this.isCompare()
     const setCfg = (patch: Partial<Cfg>) => this.setState(x => ({
       cfgs: x.cfgs.map((cc, j) => {
         if (j !== i) return cc
         const next = { ...cc, ...patch }
+        next.n = clampNodes(HW.find(h => h.id === next.hw)!, next.n ?? 1)
         // a newly picked model may lack the selected quant — fall back to its smallest
         const nm = MODELS.find(mm => mm.id === next.model)!
         if (!nm.quants[next.quant]) next.quant = quantsFor(nm)[0].id
@@ -454,7 +459,7 @@ export class App extends Component<{}, St> {
     return {
       showPreset: i === 0, showBadge: compare, rowBadge: i ? 'B' : 'A',
       rowBadgeStyle: `width:20px; height:20px; border-radius:6px; background:${i ? 'var(--c-badge-b-bg)' : 'var(--c-bg-muted)'}; color:${i ? 'var(--c-badge-b)' : 'var(--c-text-sec)'}; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0`,
-      hwName: hw.name, modelName: m.name, quantName: q.label,
+      hwName: setupName(hw, n), modelName: m.name, quantName: q.label,
       hwDdOpen: s.dd === dd('hw'), modelDdOpen: s.dd === dd('model'), quantDdOpen: s.dd === dd('quant'),
       toggleHwDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('hw') ? null : dd('hw') })) },
       toggleModelDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('model') ? null : dd('model') })) },
@@ -464,6 +469,12 @@ export class App extends Component<{}, St> {
         pick: (e: Event) => { e.stopPropagation(); this.setState({ hwSort: id }) },
         style: sortBtn(s.hwSort === id),
       })),
+      nodeBtns: nodeCounts(hw).map(k => ({
+        label: `×${k}`,
+        pick: (e: Event) => { e.stopPropagation(); setCfg({ n: k }) },
+        style: sortBtn(n === k),
+      })),
+      linkLabel: linkFor(hw).label,
       modelSortBtns: ([['pop', 'Popular'], ['size', 'Size']] as ['pop' | 'size', string][]).map(([id, label]) => ({
         label,
         pick: (e: Event) => { e.stopPropagation(); this.setState({ modelSort: id }) },
@@ -471,11 +482,11 @@ export class App extends Component<{}, St> {
       })),
       hwOpts: this.groupOpts(
         [...HW].sort((a, b) => s.hwSort === 'ram' ? b.vram_gb - a.vram_gb || a.popularity_rank - b.popularity_rank : a.popularity_rank - b.popularity_rank),
-        h => calc(h, m, q, ctx).fit,
+        h => calc(h, m, q, ctx, clampNodes(h, n)).fit,
         h => ({ name: h.name, meta: `${h.vram_gb} GB${h.status === 'announced' ? ' · announced' : ''}`, sel: h.id === cfg.hw, pick: () => setCfg({ hw: h.id }) })),
       modelOpts: this.groupOpts(
         [...MODELS].sort((a, b) => s.modelSort === 'size' ? a.total_params_b - b.total_params_b || a.popularity_rank - b.popularity_rank : a.popularity_rank - b.popularity_rank),
-        mm => calc(hw, mm, quantOf(mm.quants[q.id] ? q.id : quantsFor(mm)[0].id), ctx).fit,
+        mm => calc(hw, mm, quantOf(mm.quants[q.id] ? q.id : quantsFor(mm)[0].id), ctx, n).fit,
         mm => ({ name: mm.name, meta: `${mm.total_params_b} B`, sel: mm.id === cfg.model, pick: () => setCfg({ model: mm.id }) })),
       quantOpts: quantsFor(m).map(qq => ({
         name: qq.label, meta: qq.id === 'q4_k_m' ? 'small · fast' : qq.id === 'q8_0' ? 'balanced' : qq.id === 'fp16' ? 'full quality' : `${m.quants[qq.id].file_gb.toFixed(1)} GB`,
@@ -534,7 +545,7 @@ export class App extends Component<{}, St> {
       return c.fit === 'no' ? [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },
         { n: '2', f: `KV cache @ ${ctx.toLocaleString()} ctx tokens (${m.kv_gb_per_8k} GB per 8k)`, v: `${c.kv.toFixed(1)} GB` },
-        { n: '3', f: `Total vs usable memory (${hw.vendor === 'apple' ? '75% of unified' : '93% of VRAM'})`, v: `${c.total.toFixed(1)} / ${c.usable.toFixed(1)} GB` },
+        { n: '3', f: `Total vs usable memory (${hw.vendor === 'apple' ? '75% of unified' : '93% of VRAM'}${c.n > 1 ? `, pooled over ${c.n} devices` : ''})`, v: `${c.total.toFixed(1)} / ${c.usable.toFixed(1)} GB` },
         { n: '4', f: 'Result', v: "won't run" },
       ] : [
         { n: '1', f: `Weights: ${m.total_params_b} B params @ ${q.label} (file size)`, v: `${c.w.toFixed(1)} GB` },
@@ -543,20 +554,21 @@ export class App extends Component<{}, St> {
         { n: '4', f: c.fit === 'partial'
           ? `Decode: hybrid offload — ${Math.round(c.gpuShare * 100)}% of active weights read at GPU speed (${hw.bandwidth_gbs} GB/s × ${c.eff}), ${Math.round((1 - c.gpuShare) * 100)}% at system-RAM speed (~${OFFLOAD.ram_bw_gbs} GB/s)`
           : c.fromCombo
-          ? 'Decode: benchmark range for this combo × context derating'
+          ? `Decode: ${c.n > 1 ? 'single-device ' : ''}benchmark range for this combo × context derating`
           : `Decode ≈ bandwidth × efficiency ÷ active weights: ${hw.bandwidth_gbs} GB/s × ${c.eff} ÷ ${c.aw.toFixed(1)} GB`, v: `${fmt(c.base)} tok/s` },
-        { n: '5', f: c.fit === 'partial' ? 'Spread: calibrated from measured offload runs (RAM speeds vary)' : c.fromCombo ? 'Spread: holdout-validated interval' : 'Spread ±15% (engine, thermals, runtime)', v: `${fmt(c.lo)}–${fmt(c.hi)} tok/s` },
+        ...(c.n > 1 ? [{ n: '4b', f: `Cluster: ${c.n}× over ${linkFor(hw).label}, ${linkFor(hw).mode === 'tensor' ? 'tensor parallel' : 'layer split'}${m.active_params_b < m.total_params_b ? ' (MoE scales less)' : ''}. Decode ×${c.decF.toFixed(2)}, prefill ×${c.preF.toFixed(2)} vs one device`, v: 'projected' }] : []),
+        { n: '5', f: c.fit === 'partial' ? 'Spread: calibrated from measured offload runs (RAM speeds vary)' : c.fromCombo && c.n > 1 ? 'Spread: single-device interval × cluster scaling (projected)' : c.fromCombo ? 'Spread: holdout-validated interval' : 'Spread ±15% (engine, thermals, runtime)', v: `${fmt(c.lo)}–${fmt(c.hi)} tok/s` },
         { n: '6', f: `Prefill ≈ ${Math.round(c.pre).toLocaleString()} tok/s → ${ctx.toLocaleString()} ÷ that + overhead`, v: `TTFT ${c.ttft < 10 ? c.ttft.toFixed(1) : Math.round(c.ttft)} s` },
       ]
     }
-    const breakdownSecs = rows.map((r, i) => ({ showLabel: compare, label: `${i ? 'B' : 'A'} — ${r._hw.name} · ${r._m.name} · ${r._q.label}`, rows: mkRows(r) }))
+    const breakdownSecs = rows.map((r, i) => ({ showLabel: compare, label: `${i ? 'B' : 'A'} — ${setupName(r._hw, r._c.n)} · ${r._m.name} · ${r._q.label}`, rows: mkRows(r) }))
     let suggShow = false, suggLabel = '', suggQ: string | null = null
     if (!compare && c0.fit !== 'fits') {
-      const { hw, m, q } = this.resolve(s.cfgs[0])
+      const { hw, m, q, n } = this.resolve(s.cfgs[0])
       const curGb = m.quants[q.id] ? m.quants[q.id].file_gb : Infinity
       for (const alt of quantsFor(m)) {
         if (m.quants[alt.id].file_gb >= curGb) continue
-        const ac = calc(hw, m, alt, ctx)
+        const ac = calc(hw, m, alt, ctx, n)
         if (ac.fit === 'fits') { suggShow = true; suggQ = alt.id; suggLabel = `Switch to ${alt.label} — fits, ~${fmt(ac.lo)}–${fmt(ac.hi)} tok/s`; break }
       }
     }
@@ -574,7 +586,7 @@ export class App extends Component<{}, St> {
       return {
         badge: i ? 'B' : 'A',
         badgeStyle: `width:20px; height:20px; border-radius:6px; background:${i ? 'var(--c-badge-b-bg)' : 'var(--c-bg-muted)'}; color:${i ? 'var(--c-badge-b)' : 'var(--c-text-sec)'}; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0`,
-        title: `${l.hw.name} · ${l.m.name} · ${l.q.label}`,
+        title: `${setupName(l.hw, l.c.n)} · ${l.m.name} · ${l.q.label}`,
         cardStyle: `border:1px solid ${won ? 'oklch(0.62 0.17 30 / .45)' : 'var(--c-border)'}; border-radius:16px; background:var(--c-bg); overflow:hidden; ${won ? 'box-shadow:0 4px 20px oklch(0.62 0.17 30 / .12)' : ''}`,
         norun: sl.phase === 'norun',
         norunText: `Won't run: needs ${l.c.total.toFixed(1)} GB, has ${l.c.usable.toFixed(1)} GB usable. Sits this race out.`,
@@ -659,7 +671,7 @@ export class App extends Component<{}, St> {
         if (v === 'ink-solid') return `${base}; background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)`
         return `${base}; background:none; border:1px solid var(--c-border); color:var(--c-text-sec); font-weight:500`
       })(),
-      addCompare: () => { track('compare'); this.setState(x => ({ cfgs: [x.cfgs[0], { ...x.cfgs[0], hw: x.cfgs[0].hw === 'm4-pro-24gb' ? 'rtx-4090' : 'm4-pro-24gb' }], lanes: [], racePrompt: '', phase: 'idle' as const })) },
+      addCompare: () => { track('compare'); this.setState(x => ({ cfgs: [x.cfgs[0], (() => { const hw = x.cfgs[0].hw === 'm4-pro-24gb' ? 'rtx-4090' : 'm4-pro-24gb'; return { ...x.cfgs[0], hw, n: clampNodes(HW.find(h => h.id === hw)!, x.cfgs[0].n) } })()], lanes: [], racePrompt: '', phase: 'idle' as const })) },
       removeCompare: () => this.setState(x => ({ cfgs: [x.cfgs[0]], lanes: [], phase: 'idle' as const })),
       share: () => this.share(),
       shareLabel: s.shared ? 'Copied' : 'Share',
@@ -672,7 +684,7 @@ export class App extends Component<{}, St> {
       runpodClick: (hw: string) => track('runpod-click', { hw }),
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
       wontRun: !compare && c0.fit === 'no' && !busy && !(collapse && s.cfgOpen),
-      wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${r._hw.name} has ${c0.usable.toFixed(1)} GB usable. ${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
+      wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
       suggShow, suggLabel,
       applySugg: () => suggQ && this.setState(x => ({ cfgs: x.cfgs.map((cc, j) => j === 0 ? { ...cc, quant: suggQ! } : cc) })),
       tokHelp: 'How many words per second the model streams. ~15 tok/s reads like fast typing; 50+ feels instant.',
@@ -946,6 +958,11 @@ export class App extends Component<{}, St> {
                       <div style="display:flex; gap:4px; padding:4px 4px 8px">
                         <span style="font-size:11px; color:var(--c-text-faint); padding:4px 6px 0">Sort by</span>
                         {r.hwSortBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
+                      </div>
+                      <div style="display:flex; align-items:center; gap:4px; padding:0 4px 8px; flex-wrap:wrap">
+                        <span style="font-size:11px; color:var(--c-text-faint); padding:0 6px">Devices</span>
+                        {r.nodeBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
+                        {r.nodeBtns.length > 1 && <span style="font-size:11px; color:var(--c-text-faint); padding:0 6px">via {r.linkLabel}</span>}
                       </div>
                       <div style="overflow-y:auto; display:flex; flex-direction:column">
                         {r.hwOpts.map((o, j) => o.hdr
