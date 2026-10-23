@@ -552,7 +552,7 @@ export class App extends Component<{}, St> {
           : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
           : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!) + (isVendorScore(mm.id, s.bench) ? '*' : '')) : `${mm.total_params_b} B`, ctxLabel(mm.context_max), releasedLabel(mm.id)].filter(Boolean).map(x => x.replace(/ /g, '\u00a0')).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg(rankedOf(mm) ? { model: mm.id, quant: rankedOf(mm)!.q.id } : { model: mm.id }), mark: markOf(mm) })),
       quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n, s.kvq).fit })).map(({ qq, fit }) => ({
-        name: qq.label, meta: [quantNote(qq.id, m.total_params_b), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
+        name: qq.label, meta: [quantNote(qq.id, m.total_params_b, m.id), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
         fitColor: fit === 'no' ? fitColors.no : fit === 'partial' ? fitColors.partial : '',
         pick: () => setCfg({ quant: qq.id }),
         style: `display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; text-align:left; border:none; background:${qq.id === cfg.quant ? 'var(--c-bg-muted)' : 'none'}; border-radius:9px; padding:8px 10px; font-size:13px; cursor:pointer; color:var(--c-text)`,

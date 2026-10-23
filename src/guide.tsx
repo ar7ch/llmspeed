@@ -4,6 +4,7 @@
 // access so the page prerenders.
 import type { CalcResult } from './calc'
 import { fmt, RUNTIME_GB } from './calc'
+import { nativeLowBit } from './data'
 
 /** silent reading ≈ 238 wpm (Brysbaert 2019) ≈ 5.3 tok/s at 0.75 words per token */
 export const READING_TPS = 5.3
@@ -53,12 +54,12 @@ export function workloads(c: CalcResult, at: (ctx: number) => CalcResult, contex
 }
 
 /** short quality note for a quant id; params matter because big models tolerate low bits better */
-export function quantNote(id: string, totalParamsB: number): string {
+export function quantNote(id: string, totalParamsB: number, modelId: string): string {
   if (id === 'fp16') return 'reference quality'
-  if (id === 'mxfp4') return 'native format, full quality'
+  if (nativeLowBit(modelId, id)) return 'native format, full quality'
   if (/q8/.test(id)) return 'indistinguishable'
   if (/q6|q5/.test(id)) return 'near-lossless'
-  if (/q4|iq4/.test(id)) return 'small loss'
+  if (/q4|iq4|mxfp4/.test(id)) return 'small loss'
   if (/q3|iq3/.test(id)) return totalParamsB >= 100 ? 'minor loss on big models' : 'noticeable on code/math'
   if (/q2|iq2/.test(id)) return totalParamsB >= 200 ? 'usable on huge models' : 'large loss'
   if (/iq1/.test(id)) return totalParamsB >= 400 ? 'last resort, huge models only' : 'broken on this size'

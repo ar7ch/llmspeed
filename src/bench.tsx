@@ -2,7 +2,7 @@
 // that run on the selected setup in the accent color. Scores are for full-precision weights;
 // quantization costs some of it (see the quant notes).
 import { Component } from 'preact'
-import { BENCHES, HW, MODELS, type Bench, isVendorScore, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
+import { BENCHES, HW, MODELS, type Bench, isVendorScore, nativeLowBit, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type KvQ } from './calc'
 
 const ACCENT = 'oklch(0.62 0.17 30)'
@@ -36,8 +36,7 @@ function bestRun(hw: Hw, n: number, m: Model, ctx: number, kvq: KvQ): { q: Quant
 // TODO: rule-of-thumb factors, replace with per-model quantized eval results if they get published
 export function quantKeep(q: Quant, m: Model): number {
   const p = m.total_params_b
-  // NOTE: Kimi ships native INT4 and GPT-OSS and MiMo native MXFP4 weights, so their 4-bit files are full quality
-  if (/kimi|gpt-oss|mimo/.test(m.id) && /q4|mxfp4/.test(q.id)) return 1
+  if (nativeLowBit(m.id, q.id)) return 1
   if (/iq1/.test(q.id)) return p >= 400 ? 0.78 : 0.4
   if (/q2|iq2/.test(q.id)) return p >= 200 ? 0.92 : 0.75
   if (/q3|iq3/.test(q.id)) return p >= 100 ? 0.96 : 0.92

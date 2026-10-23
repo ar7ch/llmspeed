@@ -168,6 +168,9 @@ export const HW: Hw[] = [...DATA.hardware].sort((a, b) => a.popularity_rank - b.
 export const MODELS: Model[] = [...DATA.models].sort((a, b) => a.popularity_rank - b.popularity_rank)
 export const PROMPT_PRESET_TOKS: number[] = DATA.prompt_presets
 
+/** Kimi ships native INT4, GPT-OSS and MiMo native MXFP4 weights, so their 4-bit files are full quality */
+export const nativeLowBit = (modelId: string, quantId: string) => /kimi|gpt-oss|mimo/.test(modelId) && /^(ud-)?q4_|^mxfp4$/.test(quantId)
+
 export function quantOf(id: string): Quant {
   return { id, label: id.toUpperCase() }
 }
