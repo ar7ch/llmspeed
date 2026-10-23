@@ -2,7 +2,7 @@
 // that run on the selected setup in the accent color. Scores are for full-precision weights;
 // quantization costs some of it (see the quant notes).
 import { Component } from 'preact'
-import { BENCHES, HW, MODELS, macLimitNote, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
+import { BENCHES, HW, MODELS, macLimitNote, releasedLabel, releasedOf, macRaisedUsable, nodeCounts, quantsFor, scoresOf, setupName, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult } from './calc'
 
 const ACCENT = 'oklch(0.62 0.17 30)'
@@ -10,6 +10,7 @@ const ACCENT = 'oklch(0.62 0.17 30)'
 // only models and benchmark editions from 2026 on; older ones compare poorly with current ones
 const SINCE = '2026-01-01'
 const CURRENT = MODELS.filter(m => releasedOf(m.id) >= SINCE)
+const BY_GB = [...HW].sort((a, b) => b.vram_gb - a.vram_gb || a.popularity_rank - b.popularity_rank)
 
 /** 1- or 2-bit quants: these lose real quality, so a published full-precision score overstates them */
 const lowBits = (q: Quant) => /iq1/.test(q.id) ? 1 : /q2|iq2/.test(q.id) ? 2 : 0
@@ -51,7 +52,7 @@ export class BenchChart extends Component<Props, St> {
         </p>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px">
           <select aria-label="Hardware" class="bench-select" value={hw.id} onChange={e => { const h = HW.find(x => x.id === (e.target as HTMLSelectElement).value)!; setHw(h, nodeCounts(h).includes(n) ? n : 1) }}>
-            {HW.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+            {BY_GB.map(h => <option key={h.id} value={h.id}>{h.name} · {h.vram_gb} GB</option>)}
           </select>
           <select aria-label="Devices" class="bench-select" value={n} onChange={e => setHw(hw, +(e.target as HTMLSelectElement).value)}>
             {nodeCounts(hw).map(k => <option key={k} value={k}>{k === 1 ? '1 device' : `${k} devices`}</option>)}
@@ -87,7 +88,7 @@ export class BenchChart extends Component<Props, St> {
         </div>
         <div style="min-height:40px; margin-top:10px; font-size:12.5px; color:var(--c-text-sec); line-height:1.5">
           {hv ? <>
-            <strong style="color:var(--c-ink)">{hv.m.name}</strong>: {fmtScore(hv.s!)}{b.unit} on {b.short}{scoresOf(hv.m.id)._note ? ` (${scoresOf(hv.m.id)._note})` : ''}.{' '}
+            <strong style="color:var(--c-ink)">{hv.m.name}</strong>{releasedLabel(hv.m.id) && ` (${releasedLabel(hv.m.id)})`}: {fmtScore(hv.s!)}{b.unit} on {b.short}{scoresOf(hv.m.id)._note ? ` (${scoresOf(hv.m.id)._note})` : ''}.{' '}
             {hv.c.fit === 'no' ? `Needs ${hv.c.total.toFixed(0)} GB even at ${hv.q.label}; ${setupName(hw, n)} has ${hv.c.usable.toFixed(0)} GB usable.`
               : `${lowBits(hv.q) ? `Only fits at ${hv.q.label}, a ${lowBits(hv.q)}-bit quant: expect a clearly lower score than the full-precision one shown. ` : ''}Runs at ${hv.q.label}: ${fmt(hv.c.lo)}–${fmt(hv.c.hi)} tok/s, ${hv.c.total.toFixed(0)} of ${hv.c.usable.toFixed(0)} GB${hv.c.fit === 'partial' ? ', part offloaded to system RAM' : ''}.`}
           </> : <span style="color:var(--c-text-muted)">{b.note} <a href={b.url} target="_blank" rel="noopener" style="color:var(--c-text-sec)">Source</a></span>}

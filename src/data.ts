@@ -111,6 +111,9 @@ export interface Bench {
 /** published scores per model id; `_note` says which variant or mode the scores belong to */
 export type Scores = Record<string, number | string | undefined> & { _note?: string }
 
+/** throughput past the longest prompt preset falls as (1 + from/K) / (1 + ctx/K) */
+export interface LongCtx { from_tokens: number; decode_k_dense: number; decode_k_moe: number; prefill_k: number }
+
 interface AppData {
   prompt_presets: number[]
   hardware: Hw[]
@@ -123,6 +126,7 @@ interface AppData {
   cluster_runs?: ClusterRun[]
   benchmarks?: Bench[]
   scores?: Record<string, Scores>
+  long_context?: LongCtx
   /** first open-weights release, YYYY-MM-DD */
   released?: Record<string, string>
   projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>>
@@ -142,6 +146,7 @@ const DATA: AppData = {
   benchmarks: EXTRA.benchmarks,
   scores: EXTRA.scores,
   released: EXTRA.released,
+  long_context: EXTRA.long_context,
   projected_decode_eff: EXTRA.projected_decode_eff,
 }
 
@@ -172,6 +177,8 @@ export function decodeEff(backend: Backend, moe: boolean): number {
   const e = DATA.projected_decode_eff?.[backend]
   return e ? (moe ? e.moe : e.dense) : coeffs(backend).decode_bw_eff
 }
+
+export const LONG_CTX: LongCtx = DATA.long_context ?? { from_tokens: 12500, decode_k_dense: 100000, decode_k_moe: 50000, prefill_k: 30000 }
 
 export const OFFLOAD: OffloadCal = DATA.offload ?? { ram_bw_gbs: 55, err_q50: 1.5, err_q80: 2.0, n_rows: 0 }
 
@@ -204,6 +211,11 @@ export const setupName = (hw: Hw, n: number) => n > 1 ? `${n}× ${hw.name}` : hw
 
 export const BENCHES: Bench[] = DATA.benchmarks ?? []
 export const releasedOf = (modelId: string) => DATA.released?.[modelId] ?? ''
+/** "Apr 2026", or '' when unknown */
+export const releasedLabel = (modelId: string) => {
+  const d = releasedOf(modelId)
+  return d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''
+}
 export const scoresOf = (modelId: string): Scores => DATA.scores?.[modelId] ?? {}
 
 export const clusterRuns = (hwId: string, modelId: string) =>

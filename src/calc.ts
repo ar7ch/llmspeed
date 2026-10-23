@@ -1,4 +1,4 @@
-import { coeffs, combo, decodeEff, linkFor, OFFLOAD, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
+import { coeffs, combo, decodeEff, linkFor, LONG_CTX, OFFLOAD, PROMPT_PRESET_TOKS, type ComboPred, type Hw, type Model, type Quant } from './data'
 
 export type Fit = 'fits' | 'partial' | 'no'
 export type Conf = 'measured' | 'derived' | 'projected' | null
@@ -44,7 +44,16 @@ const CLUSTER_MEM_EFF = 0.97
 // model has no file for (e.g. a stale share link); real sizes come from app-data.
 const FALLBACK_BPP: Record<string, number> = { q4_k_m: 0.61, q8_0: 1.06, fp16: 2.0 }
 
-// log-linear interpolation of the combo's per-preset prefill midpoints over context depth
+// Long contexts: the per-8K exponential derating fits short prompts but is far too gentle past
+// ~16K (an RTX PRO 6000 measured 38 tok/s decode at 256K against 199 at 4K), so beyond the
+// longest preset throughput follows a hyperbola fitted to measured long-context runs.
+function longCtx(ctx: number, k: number): number {
+  const from = LONG_CTX.from_tokens
+  return ctx <= from ? 1 : (1 + from / k) / (1 + ctx / k)
+}
+
+// log-linear interpolation of the combo's per-preset prefill midpoints over context depth; past the
+// longest preset the long-context curve takes over instead of holding the rate flat
 function comboPrefill(cb: ComboPred | undefined, ctx: number): number | null {
   if (!cb || !cb.prefill_tps || !cb.prefill_tps.length) return null
   const n = Math.min(cb.prefill_tps.length, PROMPT_PRESET_TOKS.length)
@@ -57,7 +66,7 @@ function comboPrefill(cb: ComboPred | undefined, ctx: number): number | null {
       return mids[i - 1] + (mids[i] - mids[i - 1]) * t
     }
   }
-  return mids[n - 1]
+  return mids[n - 1] * longCtx(ctx, LONG_CTX.prefill_k)
 }
 
 export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult {
@@ -69,10 +78,11 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult
   // clusters don't offload to system RAM: the model fits in pooled memory or doesn't run
   const fit: Fit = total <= usable ? 'fits'
     : (n === 1 && hw.vendor !== 'apple' && hw.form_factor !== 'server' && total <= usable * 2.4 ? 'partial' : 'no')
-  const derate = Math.pow(co.ctx_derate_per_8k, ctx / 8192)
+  const moe = m.active_params_b < m.total_params_b
+  const shortDerate = Math.pow(co.ctx_derate_per_8k, Math.min(ctx, LONG_CTX.from_tokens) / 8192)
+  const derate = shortDerate * longCtx(ctx, moe ? LONG_CTX.decode_k_moe : LONG_CTX.decode_k_dense)
   const aw = w * (m.active_params_b / m.total_params_b)
   const cb = combo(hw.id, m.id, q.id)
-  const moe = m.active_params_b < m.total_params_b
   const eff = decodeEff(hw.backend, moe)
 
   let lo: number, hi: number, conf: Conf, fromCombo = false
@@ -117,7 +127,7 @@ export function calc(hw: Hw, m: Model, q: Quant, ctx: number, n = 1): CalcResult
   if (hw.status === 'announced') conf = 'projected'
   const base = (lo + hi) / 2
 
-  let pre = (comboPrefill(cb, ctx) ?? (hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)) * derate) * preF
+  let pre = (comboPrefill(cb, ctx) ?? (hw.tflops_fp16 * 1000 * co.prefill_flops_eff / (2 * m.active_params_b)) * shortDerate * longCtx(ctx, LONG_CTX.prefill_k)) * preF
   if (fit === 'partial') pre *= 0.5
   const ttft = ctx / pre + (fit === 'partial' ? 1.2 : 0.3)
 

@@ -1588,5 +1588,13 @@
   "devstral-small-2-24b": "2025-12-09",
   "devstral-2-123b": "2025-12-09",
   "magistral-small-2509": "2025-09-17"
+ },
+ "long_context": {
+  "from_tokens": 12500,
+  "decode_k_dense": 100000,
+  "decode_k_moe": 50000,
+  "prefill_k": 30000,
+  "note": "Past from_tokens, speed scales by (1 + from/K) / (1 + ctx/K). Fit to llama.cpp long-context rows: Qwen3-30B-A3B and Devstral 2 on RTX 3090/4090/5090/PRO 6000 at 4K-262K.",
+  "source": "https://www.hardware-corner.net/gpu-llm-benchmarks/rtx-pro-6000-blackwell/"
  }
 }

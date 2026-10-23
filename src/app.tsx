@@ -1,9 +1,10 @@
 import { Component, type ComponentChild } from 'preact'
-import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
+import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, releasedLabel, releasedOf, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type Fit } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
 import { BenchChart, fmtScore } from './bench'
+import { AGENT_CTX, quantNote, workloads } from './guide'
 
 // Design knobs — values match the mockup's exported defaults (Tokens Simulator v3).
 const CONFIG = {
@@ -37,9 +38,12 @@ interface LaneSt { phase: 'norun' | 'prefill' | 'stream' | 'done'; prefillT: num
 interface St {
   cfgs: Cfg[]; preset: number; custom: string | null; phase: 'idle' | 'running' | 'done'
   streamText: string; liveTok: number; prefillT: number; breakdownOpen: boolean; history: Msg[]
-  dd: string | null; tip: string | null; hwSort: 'pop' | 'ram'; modelSort: 'pop' | 'size' | 'speed' | 'score'
+  dd: string | null; tip: string | null; hwSort: 'pop' | 'ram'; modelSort: 'pop' | 'params' | 'size' | 'date' | 'speed' | 'score'
   /** benchmark shown in the quality chart and used by the model dropdown's Score sort */
   bench: string
+  /** model and hardware dropdown search text */
+  modelQ: string
+  hwQ: string
   lanes: LaneSt[]; racePrompt: string; shared: boolean; dark: boolean
   feelPhase: 'type' | 'hold' | 'erase'; feelN: number; feelT: number
   isMobile: boolean; cfgOpen: boolean; composerH: number
@@ -62,7 +66,7 @@ export class App extends Component<{}, St> {
     const base: St = {
       cfgs: [{ hw: 'rtx-4090', model: 'llama-3.1-8b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
       streamText: '', liveTok: 0, prefillT: 0, breakdownOpen: false, history: [],
-      dd: null, tip: null, hwSort: 'pop', modelSort: 'pop', bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
+      dd: null, tip: null, hwSort: 'ram', modelSort: 'params', modelQ: '', hwQ: '', bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
       // index.html picks the theme before first paint (saved choice, else system setting)
       dark: typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'),
       feelPhase: 'type', feelN: 0, feelT: 0,
@@ -167,6 +171,13 @@ export class App extends Component<{}, St> {
   }
   isCompare() { return this.state.cfgs.length > 1 }
 
+  /** every typed word must appear in the name or id */
+  static matches(q: string, text: string) { return q.toLowerCase().split(/\s+/).every(w => text.toLowerCase().includes(w)) }
+  searchInput(label: string, value: string, onInput: (e: Event) => void) {
+    return <input type="search" placeholder={`Search ${label}`} aria-label={`Search ${label}`} value={value} onInput={onInput} onClick={(e: Event) => e.stopPropagation()}
+      ref={(el: HTMLInputElement | null) => { if (el && !el.dataset.f) { el.dataset.f = '1'; el.focus() } }}
+      style="margin:0 4px 8px; padding:7px 11px; font:inherit; font-size:13px; color:var(--c-text); background:var(--c-bg-subtle); border:1px solid var(--c-border); border-radius:9px; outline:none" />
+  }
   groupOpts<T>(sorted: T[], fitOf: (x: T) => Fit, mapFn: (x: T) => { name: string; meta: string; sel: boolean; pick: () => void }): OptRow[] {
     const groups: Record<Fit, T[]> = { fits: [], partial: [], no: [] }
     sorted.forEach(x => groups[fitOf(x)].push(x))
@@ -469,8 +480,12 @@ export class App extends Component<{}, St> {
       rowBadgeStyle: `width:20px; height:20px; border-radius:6px; background:${i ? 'var(--c-badge-b-bg)' : 'var(--c-bg-muted)'}; color:${i ? 'var(--c-badge-b)' : 'var(--c-text-sec)'}; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0`,
       hwName: setupName(hw, n), modelName: m.name, quantName: q.label,
       hwDdOpen: s.dd === dd('hw'), modelDdOpen: s.dd === dd('model'), quantDdOpen: s.dd === dd('quant'),
-      toggleHwDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('hw') ? null : dd('hw') })) },
-      toggleModelDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('model') ? null : dd('model') })) },
+      toggleHwDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('hw') ? null : dd('hw'), hwQ: '' })) },
+      hwQ: s.hwQ,
+      setHwQ: (e: Event) => this.setState({ hwQ: (e.target as HTMLInputElement).value }),
+      toggleModelDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('model') ? null : dd('model'), modelQ: '' })) },
+      modelQ: s.modelQ,
+      setModelQ: (e: Event) => this.setState({ modelQ: (e.target as HTMLInputElement).value }),
       toggleQuantDd: (e: Event) => { e.stopPropagation(); this.setState(x => ({ dd: x.dd === dd('quant') ? null : dd('quant'), tip: null })) },
       hwSortBtns: ([['pop', 'Popular'], ['ram', 'RAM']] as ['pop' | 'ram', string][]).map(([id, label]) => ({
         label,
@@ -483,25 +498,28 @@ export class App extends Component<{}, St> {
         style: sortBtn(n === k),
       })),
       linkLabel: linkFor(hw).label,
-      modelSortBtns: ([['pop', 'Popular'], ['size', 'Weights'], ['speed', 'Speed'], ['score', BENCHES.find(b => b.id === s.bench)?.short ?? 'Score']] as [St['modelSort'], string][]).map(([id, label]) => ({
+      modelSortBtns: ([['pop', 'Popular'], ['params', 'Params'], ['size', 'Weights'], ['date', 'Newest'], ['speed', 'Speed'], ['score', BENCHES.find(b => b.id === s.bench)?.short ?? 'Score']] as [St['modelSort'], string][]).map(([id, label]) => ({
         label,
         pick: (e: Event) => { e.stopPropagation(); this.setState({ modelSort: id }) },
         style: sortBtn(s.modelSort === id),
       })),
       hwOpts: this.groupOpts(
-        [...HW].sort((a, b) => s.hwSort === 'ram' ? b.vram_gb - a.vram_gb || a.popularity_rank - b.popularity_rank : a.popularity_rank - b.popularity_rank),
+        HW.filter(h => App.matches(s.hwQ, `${h.name} ${h.id}`)).sort((a, b) => s.hwSort === 'ram' ? b.vram_gb - a.vram_gb || a.popularity_rank - b.popularity_rank : a.popularity_rank - b.popularity_rank),
         h => calc(h, m, q, ctx, clampNodes(h, n)).fit,
         h => ({ name: h.name, meta: `${h.vram_gb} GB${h.status === 'announced' ? ' · announced' : ''}`, sel: h.id === cfg.hw, pick: () => setCfg({ hw: h.id }) })),
       modelOpts: this.groupOpts(
-        [...MODELS].sort((a, b) => (s.modelSort === 'size' ? weightsGb(a) - weightsGb(b)
+        MODELS.filter(mm => App.matches(s.modelQ, `${mm.name} ${mm.id}`)).sort((a, b) => (s.modelSort === 'params' ? b.total_params_b - a.total_params_b
+          : s.modelSort === 'size' ? weightsGb(b) - weightsGb(a)
+          : s.modelSort === 'date' ? releasedOf(b.id).localeCompare(releasedOf(a.id))
           : s.modelSort === 'speed' ? mcalc(b).base - mcalc(a).base
           : s.modelSort === 'score' ? (score(b) ?? -1) - (score(a) ?? -1) : 0) || a.popularity_rank - b.popularity_rank),
         mm => mcalc(mm).fit,
-        mm => ({ name: mm.name, meta: s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
+        mm => ({ name: mm.name, meta: [s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
           : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
-          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, sel: mm.id === cfg.model, pick: () => setCfg({ model: mm.id }) })),
-      quantOpts: quantsFor(m).map(qq => ({
-        name: qq.label, meta: qq.id === 'q4_k_m' ? 'small · fast' : qq.id === 'q8_0' ? 'balanced' : qq.id === 'fp16' ? 'full quality' : `${m.quants[qq.id].file_gb.toFixed(1)} GB`,
+          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, releasedLabel(mm.id)].filter(Boolean).join(' · '), sel: mm.id === cfg.model, pick: () => setCfg({ model: mm.id }) })),
+      quantOpts: quantsFor(m).map(qq => ({ qq, fit: calc(hw, m, qq, ctx, n).fit })).map(({ qq, fit }) => ({
+        name: qq.label, meta: [quantNote(qq.id, m.total_params_b), `${m.quants[qq.id].file_gb.toFixed(0)} GB`, fit === 'no' ? "won't fit" : fit === 'partial' ? 'offload' : ''].filter(Boolean).join(' · '),
+        fitColor: fit === 'no' ? fitColors.no : fit === 'partial' ? fitColors.partial : '',
         pick: () => setCfg({ quant: qq.id }),
         style: `display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; text-align:left; border:none; background:${qq.id === cfg.quant ? 'var(--c-bg-muted)' : 'none'}; border-radius:9px; padding:8px 10px; font-size:13px; cursor:pointer; color:var(--c-text)`,
       })),
@@ -550,6 +568,7 @@ export class App extends Component<{}, St> {
         ttft: c.fit === 'no' ? '—' : (c.ttft < 10 ? c.ttft.toFixed(2).replace(/0$/, '') : String(Math.round(c.ttft))) + ' s',
         confLabel: conf[0], confDotStyle: `width:8px; height:8px; border-radius:50%; background:${conf[1]}; display:inline-block`,
         showTips: i === 0 && !compare,
+        workloads: !compare && c.fit !== 'no' ? workloads(c, calc(r._hw, r._m, r._q, AGENT_CTX, c.n), r._m.context_max) : [],
       }
     })
     const mkRows = (r: ReturnType<App['cfgRow']>) => {
@@ -703,7 +722,7 @@ export class App extends Component<{}, St> {
       wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${r._hw.vendor === 'apple' && c0.total <= macRaisedUsable(r._hw, c0.n) ? `It does fit if you raise macOS's GPU memory limit (sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(r._hw)}${c0.n > 1 ? ' on each Mac' : ''}). ` : ''}${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
       suggShow, suggLabel,
       applySugg: () => suggQ && this.setState(x => ({ cfgs: x.cfgs.map((cc, j) => j === 0 ? { ...cc, quant: suggQ! } : cc) })),
-      tokHelp: 'How many words per second the model streams. ~15 tok/s reads like fast typing; 50+ feels instant.',
+      tokHelp: 'Tokens generated per second. People read about 5 tok/s; 10–20 feels comfortable for chat, coding agents want 20+.',
       ttftHelp: 'Time to first token: how long the model reads your prompt before it starts answering. Grows with prompt length.',
       confHelp: 'How solid this prediction is. Measured = benchmarked on this exact setup. Derived = interpolated from similar setups. Projected = calculated from hardware specs alone.',
       tipTok: s.tip === 'tok', tipTtft: s.tip === 'ttft', tipConf: s.tip === 'conf',
@@ -986,7 +1005,9 @@ export class App extends Component<{}, St> {
                         {r.nodeBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
                         {r.nodeBtns.length > 1 && <span style="font-size:11px; color:var(--c-text-faint); padding:0 6px">via {r.linkLabel}</span>}
                       </div>
+                      {this.searchInput('hardware', r.hwQ, r.setHwQ)}
                       <div style="overflow-y:auto; display:flex; flex-direction:column">
+                        {r.hwOpts.length === 0 && <div style="padding:10px; font-size:12.5px; color:var(--c-text-muted)">No hardware matches "{r.hwQ}"</div>}
                         {r.hwOpts.map((o, j) => o.hdr
                           ? <div key={j} style={o.hdrStyle}><span style={o.dotStyle}></span>{o.label}</div>
                           : <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{o.name}</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint); flex-shrink:0">{o.meta}</span></button>)}
@@ -1001,12 +1022,14 @@ export class App extends Component<{}, St> {
                     <span style="color:var(--c-text-faint); font-size:9px">▾</span>
                   </button>
                   {r.modelDdOpen && (
-                    <div ref={this._menuRef} style={`position:absolute; ${v.menuAnchor}; left:0; width:min(284px, calc(100vw - 48px)); background:var(--c-bg); border:1px solid var(--c-border); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.1); z-index:30; padding:6px; max-height:320px; display:flex; flex-direction:column`}>
+                    <div ref={this._menuRef} style={`position:absolute; ${v.menuAnchor}; left:0; width:min(360px, calc(100vw - 48px)); background:var(--c-bg); border:1px solid var(--c-border); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.1); z-index:30; padding:6px; max-height:320px; display:flex; flex-direction:column`}>
                       <div style="display:flex; gap:4px; padding:4px 4px 8px; flex-wrap:wrap; align-items:center">
                         <span style="font-size:11px; color:var(--c-text-faint); padding:4px 6px 0">Sort by</span>
                         {r.modelSortBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
                       </div>
+                      {this.searchInput('models', r.modelQ, r.setModelQ)}
                       <div style="overflow-y:auto; display:flex; flex-direction:column">
+                        {r.modelOpts.length === 0 && <div style="padding:10px; font-size:12.5px; color:var(--c-text-muted)">No model matches "{r.modelQ}"</div>}
                         {r.modelOpts.map((o, j) => o.hdr
                           ? <div key={j} style={o.hdrStyle}><span style={o.dotStyle}></span>{o.label}</div>
                           : <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{o.name}</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint); flex-shrink:0">{o.meta}</span></button>)}
@@ -1021,9 +1044,9 @@ export class App extends Component<{}, St> {
                     <span style="color:var(--c-text-faint); font-size:9px">▾</span>
                   </button>
                   {r.quantDdOpen && (
-                    <div ref={this._menuRef} style={`position:absolute; ${v.menuAnchor}; left:0; width:min(250px, calc(100vw - 48px)); background:var(--c-bg); border:1px solid var(--c-border); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.1); z-index:30; padding:6px; display:flex; flex-direction:column`}>
+                    <div ref={this._menuRef} style={`position:absolute; ${v.menuAnchor}; left:0; width:min(330px, calc(100vw - 48px)); background:var(--c-bg); border:1px solid var(--c-border); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.1); z-index:30; padding:6px; display:flex; flex-direction:column`}>
                       {r.quantOpts.map((o, j) => (
-                        <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style="font-family:'IBM Plex Mono',monospace">{o.name}</span><span style="font-size:11px; color:var(--c-text-faint); flex-shrink:0">{o.meta}</span></button>
+                        <button key={j} onClick={o.pick} class="hv-bg" style={o.style}><span style={`font-family:'IBM Plex Mono',monospace; ${o.fitColor ? `color:${o.fitColor}` : ''}`}>{o.name}</span><span style={`font-size:11px; color:${o.fitColor || 'var(--c-text-faint)'}; flex-shrink:0`}>{o.meta}</span></button>
                       ))}
                     </div>
                   )}
@@ -1108,6 +1131,29 @@ export class App extends Component<{}, St> {
                 <button onClick={v.toggleBreakdown} class="hv-text-ink" style="background:none; border:none; color:var(--c-text-faint); font-size:12px; cursor:pointer; padding:4px 0">{v.breakdownToggleLabel}</button>
               </div>
             </div>
+            {v.statRows.length === 1 && (
+              <div style="margin-top:14px">
+                {v.statRows[0].workloads.length > 0 && (
+                  <div class="verdicts">
+                    {v.statRows[0].workloads.map(w => (
+                      <div key={w.label} class="verdict">
+                        <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:var(--c-text-muted)">
+                          <span aria-hidden style={`display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; font-size:10px; color:#fff; background:${w.good ? 'oklch(0.55 0.15 155)' : 'oklch(0.68 0.13 75)'}`}>{w.good ? '✓' : '!'}</span>
+                          {w.label}
+                        </div>
+                        <div style="font-size:17px; font-weight:650; color:var(--c-ink); margin-top:6px; line-height:1.2">{w.head}</div>
+                        <div style="font-size:12px; color:var(--c-text-muted); margin-top:4px; line-height:1.45">{w.detail}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px">
+                  <a href="/guide/" class="pill-link">What these mean</a>
+                  <a href={`/hardware/${v.cfgRows[0]._hw.id}/`} class="pill-link">Every model on this hardware →</a>
+                  <a href={`/models/${v.cfgRows[0]._m.id}/`} class="pill-link">Hardware that runs this model →</a>
+                </div>
+              </div>
+            )}
             {v.breakdownOpen && (
               <div style={v.breakdownWrapStyle}>
                 {v.breakdownSecs.map((sec, i) => (

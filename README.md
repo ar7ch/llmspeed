@@ -18,6 +18,9 @@ https://github.com/user-attachments/assets/534b4736-6b59-426e-bc0a-e93a196156b9
 - **Race mode:** run two setups side by side, e.g. a 5090 against a Mac Studio
 - **Memory fit:** see whether a model fits at each quantization, needs partial offload to system RAM, or won't run at all
 - **30 GPUs, Macs and CPUs × 25 popular models**, across CUDA, Metal, ROCm, Vulkan and CPU
+- **Multi-device setups:** 2 to 8 devices joined over Thunderbolt 5 RDMA (Macs), ConnectX-7 (DGX Spark), PCIe (GPUs in one PC) or Ethernet (llama.cpp RPC), with measured cluster runs shown next to the estimate
+- **Model quality chart:** 2026 benchmark scores (Terminal-Bench 2.1, AA Index, AIME 2026, τ³-bench, DeepSWE) for every 2026 model, highlighting what runs on your setup
+- **Workload verdicts and a [guide](https://llmspeed.dev/guide/):** what a given tok/s means for chat, coding help, coding agents and reasoning models, and what each quantization costs in quality
 - **Shareable links** to any setup or race
 
 ## How the numbers work
@@ -79,7 +82,8 @@ Built with [Vite](https://vite.dev), [Preact](https://preactjs.com) and TypeScri
 
 ## Limitations
 
-- **Single device only.** Multi-GPU setups (tensor or layer split) aren't simulated yet.
+- **Clusters are projected.** Multi-device speeds scale a single-device estimate by per-link factors calibrated from a handful of published runs; most of those runs used engine-native formats (MLX, NVFP4, AWQ), not GGUF.
+- **Mac memory** assumes the default macOS GPU limit (about 75% of unified memory). Raising it with `sysctl` fits bigger models; the app says how much.
 - **Estimates, not guarantees.** Drivers, engine versions, flash attention, power limits and thermals can all move real numbers by 10–30%.
 - **Projected numbers** for unreleased hardware will be replaced with measurements as they appear.
 

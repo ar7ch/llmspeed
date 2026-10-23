@@ -15,6 +15,7 @@ function jsonLd(p: Page, url: string, title: string) {
   const crumbs = [{ name: 'llmspeed', url: SITE + '/' }]
   if (p.kind === 'hw' || p.kind === 'combo') crumbs.push({ name: p.hw.name, url: SITE + pathOf({ kind: 'hw', hw: p.hw }) })
   if (p.kind === 'model') crumbs.push({ name: p.m.name, url })
+  if (p.kind === 'guide') crumbs.push({ name: 'Speed and quantization guide', url })
   if (p.kind === 'combo') crumbs.push({ name: title.split(' | ')[0], url })
   return {
     '@context': 'https://schema.org', '@type': 'BreadcrumbList',

@@ -3,7 +3,8 @@
 // (src/prerender.tsx) and below the hero in the live app, so crawlers with and without JS see
 // identical content. Must stay free of window/document access.
 import type { ComponentChildren } from 'preact'
-import { HW, MODELS, PRESETS, quantsFor, type Hw, type Model, type Quant } from './data'
+import { GuideSection } from './guide'
+import { HW, MODELS, PRESETS, quantsFor, releasedLabel, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult } from './calc'
 
 export const SITE = 'https://llmspeed.dev'
@@ -13,11 +14,13 @@ export type Page =
   | { kind: 'combo'; hw: Hw; m: Model }
   | { kind: 'hw'; hw: Hw }
   | { kind: 'model'; m: Model }
+  | { kind: 'guide' }
 
 export function pathOf(p: Page): string {
   if (p.kind === 'combo') return `/${p.m.id}-on-${p.hw.id}/`
   if (p.kind === 'hw') return `/hardware/${p.hw.id}/`
   if (p.kind === 'model') return `/models/${p.m.id}/`
+  if (p.kind === 'guide') return '/guide/'
   return '/'
 }
 
@@ -31,6 +34,7 @@ export function pageFromPath(path: string): Page {
     const m = MODELS.find(x => x.id === seg[1])
     if (m) return { kind: 'model', m }
   }
+  if (seg.length === 1 && seg[0] === 'guide') return { kind: 'guide' }
   if (seg.length === 1) {
     for (const m of MODELS) {
       if (!seg[0].startsWith(m.id + '-on-')) continue
@@ -44,6 +48,7 @@ export function pageFromPath(path: string): Page {
 export function allPages(): Page[] {
   return [
     { kind: 'home' },
+    { kind: 'guide' },
     ...HW.map(hw => ({ kind: 'hw' as const, hw })),
     ...MODELS.map(m => ({ kind: 'model' as const, m })),
     ...MODELS.flatMap(m => HW.map(hw => ({ kind: 'combo' as const, hw, m }))),
@@ -66,9 +71,10 @@ const speed = (c: CalcResult) => runs(c) ? `${fmt(c.base)} tok/s` : "Won't run"
 const ttft = (c: CalcResult) => runs(c) ? `${c.ttft < 10 ? c.ttft.toFixed(1) : Math.round(c.ttft)} s` : '—'
 const fitLabel = (c: CalcResult) => c.fit === 'fits' ? 'Fits' : c.fit === 'partial' ? 'Partial offload' : "Doesn't fit"
 const confLabel = (c: CalcResult) => c.conf === 'measured' ? 'Measured' : c.conf === 'derived' ? 'Derived' : c.conf === 'projected' ? 'Projected' : '—'
-const params = (m: Model) => m.active_params_b < m.total_params_b
+const released = (m: Model) => releasedLabel(m.id) ? `, released ${releasedLabel(m.id)}` : ''
+const params = (m: Model) => (m.active_params_b < m.total_params_b
   ? `a ${m.total_params_b}B-parameter mixture-of-experts model (${m.active_params_b}B active per token)`
-  : `a ${m.total_params_b}B-parameter model`
+  : `a ${m.total_params_b}B-parameter model`) + released(m)
 const CONF_TEXT: Record<string, string> = {
   measured: 'This estimate is based on community benchmarks of this exact setup.',
   derived: 'This estimate is interpolated from benchmarks of similar setups.',
@@ -99,6 +105,11 @@ export function pageMeta(p: Page): PageMeta {
     title: `${p.hw.name} LLM speed: tokens/sec for ${MODELS.length} models | llmspeed`,
     description: `How fast do local LLMs run on the ${p.hw.name}? Tokens/sec, time to first token and memory fit for ${MODELS.length} popular models, and watch them stream at real speed.`,
     h1: ['How fast will local models', `on the ${p.hw.name}?`],
+  }
+  if (p.kind === 'guide') return {
+    title: 'How many tokens per second do you need? Local LLM speed and quantization guide | llmspeed',
+    description: 'What tok/s and time to first token feel like for chat, coding help, coding agents and reasoning models, and how much quality each GGUF quantization (Q8, Q4_K_M, Q3, Q2, IQ1) costs, with measured numbers.',
+    h1: ['How fast should a local model', '?'],
   }
   if (p.kind === 'model') return {
     title: `${p.m.name} speed on GPUs and Macs: tokens/sec | llmspeed`,
@@ -193,6 +204,7 @@ function ModelSection({ m }: { m: Model }) {
 function HomeSection() {
   return (
     <>
+      <p><a href="/guide/">How many tokens per second do you need, and what quantization costs</a></p>
       <h2>Browse by hardware</h2>
       <LinkList items={HW.map(hw => ({ p: { kind: 'hw', hw }, label: hw.name }))} />
       <h2>Browse by model</h2>
@@ -207,6 +219,7 @@ export function SeoSection({ page }: { page: Page }) {
       {page.kind === 'combo' ? <ComboSection hw={page.hw} m={page.m} />
         : page.kind === 'hw' ? <HwSection hw={page.hw} />
         : page.kind === 'model' ? <ModelSection m={page.m} />
+        : page.kind === 'guide' ? <GuideSection />
         : <HomeSection />}
       <p class="seo-foot">Estimates for a short prompt on a single device. Measured numbers come from community benchmarks (r/LocalLLaMA, localscore.ai and more); others are derived from similar setups or projected from specs. <a href="https://github.com/nicorobinreal/llmspeed">Open source on GitHub</a>.</p>
     </section>
@@ -215,7 +228,7 @@ export function SeoSection({ page }: { page: Page }) {
 
 /** initial simulator config for a landing page; null keeps the app default */
 export function pageCfg(p: Page, def: { hw: string; model: string; quant: string }) {
-  if (p.kind === 'home') return null
+  if (p.kind === 'home' || p.kind === 'guide') return null
   // model pages open on the most popular hardware that fits the model
   const hw = p.kind === 'model' ? (HW.find(h => est(h, p.m).c.fit === 'fits') ?? HW.find(h => h.id === def.hw)!) : p.hw
   const m = p.kind === 'hw' ? MODELS.find(x => x.id === def.model)! : p.m
