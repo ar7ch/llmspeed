@@ -1,8 +1,9 @@
 import { Component, type ComponentChild } from 'preact'
-import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
+import { HW, MODELS, OFFLOAD, PRESETS, RESP, SPIN, quantOf, quantsFor, macLimitNote, macRaisedLimitMb, macRaisedUsable, BENCHES, scoresOf, clusterRuns, combo, nodeCounts, clampNodes, linkFor, setupName, canonHw, canonModel, canonQuant, type Hw, type Model, type Quant } from './data'
 import { calc, fmt, type CalcResult, type Fit } from './calc'
 import { track } from './analytics'
 import { pageFromPath, pageMeta, pageCfg, SeoSection } from './seo'
+import { BenchChart, fmtScore } from './bench'
 
 // Design knobs — values match the mockup's exported defaults (Tokens Simulator v3).
 const CONFIG = {
@@ -36,7 +37,9 @@ interface LaneSt { phase: 'norun' | 'prefill' | 'stream' | 'done'; prefillT: num
 interface St {
   cfgs: Cfg[]; preset: number; custom: string | null; phase: 'idle' | 'running' | 'done'
   streamText: string; liveTok: number; prefillT: number; breakdownOpen: boolean; history: Msg[]
-  dd: string | null; tip: string | null; hwSort: 'pop' | 'ram'; modelSort: 'pop' | 'size'
+  dd: string | null; tip: string | null; hwSort: 'pop' | 'ram'; modelSort: 'pop' | 'size' | 'speed' | 'score'
+  /** benchmark shown in the quality chart and used by the model dropdown's Score sort */
+  bench: string
   lanes: LaneSt[]; racePrompt: string; shared: boolean; dark: boolean
   feelPhase: 'type' | 'hold' | 'erase'; feelN: number; feelT: number
   isMobile: boolean; cfgOpen: boolean; composerH: number
@@ -59,7 +62,7 @@ export class App extends Component<{}, St> {
     const base: St = {
       cfgs: [{ hw: 'rtx-4090', model: 'llama-3.1-8b', quant: 'q4_k_m' }], preset: 0, custom: null, phase: 'idle',
       streamText: '', liveTok: 0, prefillT: 0, breakdownOpen: false, history: [],
-      dd: null, tip: null, hwSort: 'pop', modelSort: 'pop', lanes: [], racePrompt: '', shared: false,
+      dd: null, tip: null, hwSort: 'pop', modelSort: 'pop', bench: BENCHES[0]?.id ?? '', lanes: [], racePrompt: '', shared: false,
       // index.html picks the theme before first paint (saved choice, else system setting)
       dark: typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'),
       feelPhase: 'type', feelN: 0, feelT: 0,
@@ -455,7 +458,12 @@ export class App extends Component<{}, St> {
     const fitLabels: Record<Fit, string> = { fits: `Fits in ${c.usable.toFixed(0)} GB`, partial: 'Partial offload', no: "Won't run" }
     const fc = fitColors[c.fit]
     void fc
-    const sortBtn = (act: boolean) => `border-radius:99px; padding:3px 11px; font-size:11.5px; cursor:pointer; ${act ? 'background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)' : 'background:none; border:1px solid var(--c-border); color:var(--c-text-muted)'}`
+    // weight file size at the selected quant, or the model's smallest when it lacks that quant
+    const weightsGb = (mm: Model) => (mm.quants[q.id] ?? mm.quants[quantsFor(mm)[0].id]).file_gb
+    // the dropdown's estimate for a model: the selected quant if it has it, else its smallest
+    const mcalc = (mm: Model) => calc(hw, mm, quantOf(mm.quants[q.id] ? q.id : quantsFor(mm)[0].id), ctx, n)
+    const score = (mm: Model) => scoresOf(mm.id)[s.bench] as number | undefined
+    const sortBtn = (act: boolean) => `border-radius:99px; padding:3px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap; ${act ? 'background:var(--c-ink); border:1px solid var(--c-ink); color:var(--c-bg)' : 'background:none; border:1px solid var(--c-border); color:var(--c-text-muted)'}`
     return {
       showPreset: i === 0, showBadge: compare, rowBadge: i ? 'B' : 'A',
       rowBadgeStyle: `width:20px; height:20px; border-radius:6px; background:${i ? 'var(--c-badge-b-bg)' : 'var(--c-bg-muted)'}; color:${i ? 'var(--c-badge-b)' : 'var(--c-text-sec)'}; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0`,
@@ -475,7 +483,7 @@ export class App extends Component<{}, St> {
         style: sortBtn(n === k),
       })),
       linkLabel: linkFor(hw).label,
-      modelSortBtns: ([['pop', 'Popular'], ['size', 'Size']] as ['pop' | 'size', string][]).map(([id, label]) => ({
+      modelSortBtns: ([['pop', 'Popular'], ['size', 'Weights'], ['speed', 'Speed'], ['score', BENCHES.find(b => b.id === s.bench)?.short ?? 'Score']] as [St['modelSort'], string][]).map(([id, label]) => ({
         label,
         pick: (e: Event) => { e.stopPropagation(); this.setState({ modelSort: id }) },
         style: sortBtn(s.modelSort === id),
@@ -485,9 +493,13 @@ export class App extends Component<{}, St> {
         h => calc(h, m, q, ctx, clampNodes(h, n)).fit,
         h => ({ name: h.name, meta: `${h.vram_gb} GB${h.status === 'announced' ? ' · announced' : ''}`, sel: h.id === cfg.hw, pick: () => setCfg({ hw: h.id }) })),
       modelOpts: this.groupOpts(
-        [...MODELS].sort((a, b) => s.modelSort === 'size' ? a.total_params_b - b.total_params_b || a.popularity_rank - b.popularity_rank : a.popularity_rank - b.popularity_rank),
-        mm => calc(hw, mm, quantOf(mm.quants[q.id] ? q.id : quantsFor(mm)[0].id), ctx, n).fit,
-        mm => ({ name: mm.name, meta: `${mm.total_params_b} B`, sel: mm.id === cfg.model, pick: () => setCfg({ model: mm.id }) })),
+        [...MODELS].sort((a, b) => (s.modelSort === 'size' ? weightsGb(a) - weightsGb(b)
+          : s.modelSort === 'speed' ? mcalc(b).base - mcalc(a).base
+          : s.modelSort === 'score' ? (score(b) ?? -1) - (score(a) ?? -1) : 0) || a.popularity_rank - b.popularity_rank),
+        mm => mcalc(mm).fit,
+        mm => ({ name: mm.name, meta: s.modelSort === 'size' ? `${Math.round(weightsGb(mm))} GB`
+          : s.modelSort === 'speed' ? (mcalc(mm).fit === 'no' ? '—' : `${fmt(mcalc(mm).base)} tok/s`)
+          : s.modelSort === 'score' ? (score(mm) === undefined ? '—' : fmtScore(score(mm)!)) : `${mm.total_params_b} B`, sel: mm.id === cfg.model, pick: () => setCfg({ model: mm.id }) })),
       quantOpts: quantsFor(m).map(qq => ({
         name: qq.label, meta: qq.id === 'q4_k_m' ? 'small · fast' : qq.id === 'q8_0' ? 'balanced' : qq.id === 'fp16' ? 'full quality' : `${m.quants[qq.id].file_gb.toFixed(1)} GB`,
         pick: () => setCfg({ quant: qq.id }),
@@ -563,6 +575,7 @@ export class App extends Component<{}, St> {
     }
     const breakdownSecs = rows.map((r, i) => ({ showLabel: compare, label: `${i ? 'B' : 'A'} — ${setupName(r._hw, r._c.n)} · ${r._m.name} · ${r._q.label}`, rows: mkRows(r),
       sources: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.sources ?? [] : [],
+      macNote: r._hw.vendor === 'apple' ? macLimitNote(r._hw, r._c.n) : '',
       tested: r._c.n === 1 ? combo(r._hw.id, r._m.id, r._q.id)?.tested?.join(', ') ?? '' : '',
       runs: clusterRuns(r._hw.id, r._m.id).map(x => ({ label: `${x.n}× · ${x.engine} · ${x.link} · ${x.quant}${x.tested ? ` (tested: ${x.tested})` : ''}`, v: `${fmt(x.gen_tps)} tok/s`, href: x.source })) }))
     let suggShow = false, suggLabel = '', suggQ: string | null = null
@@ -687,7 +700,7 @@ export class App extends Component<{}, St> {
       runpodClick: (hw: string) => track('runpod-click', { hw }),
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
       wontRun: !compare && c0.fit === 'no' && !busy && !(collapse && s.cfgOpen),
-      wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
+      wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${r._hw.vendor === 'apple' && c0.total <= macRaisedUsable(r._hw, c0.n) ? `It does fit if you raise macOS's GPU memory limit (sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(r._hw)}${c0.n > 1 ? ' on each Mac' : ''}). ` : ''}${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
       suggShow, suggLabel,
       applySugg: () => suggQ && this.setState(x => ({ cfgs: x.cfgs.map((cc, j) => j === 0 ? { ...cc, quant: suggQ! } : cc) })),
       tokHelp: 'How many words per second the model streams. ~15 tok/s reads like fast typing; 50+ feels instant.',
@@ -827,6 +840,12 @@ export class App extends Component<{}, St> {
           {v.showHeroSpacer && <div style="height:61px; flex-shrink:0"></div>}
         </div>
         </div>
+        {v.heroMode && (() => {
+          const { hw, n } = this.resolve(this.state.cfgs[0])
+          return <BenchChart hw={hw} n={n} bench={this.state.bench} setBench={b => this.setState({ bench: b })} ctx={this.promptTokens()} model={this.state.cfgs[0].model}
+            setHw={(h, n) => this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, hw: h.id, n } : c) }))}
+            pick={(m, q) => { this.setState(x => ({ cfgs: x.cfgs.map((c, j) => j === 0 ? { ...c, model: m.id, quant: q.id } : c) })); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
+        })()}
         {v.heroMode && <SeoSection page={PAGE} />}
         </div>
         {v.collapse && v.cfgOpen && <div style={v.cfgPanelStyle}>{this.renderConfigBlock(v)}</div>}
@@ -983,7 +1002,7 @@ export class App extends Component<{}, St> {
                   </button>
                   {r.modelDdOpen && (
                     <div ref={this._menuRef} style={`position:absolute; ${v.menuAnchor}; left:0; width:min(284px, calc(100vw - 48px)); background:var(--c-bg); border:1px solid var(--c-border); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.1); z-index:30; padding:6px; max-height:320px; display:flex; flex-direction:column`}>
-                      <div style="display:flex; gap:4px; padding:4px 4px 8px">
+                      <div style="display:flex; gap:4px; padding:4px 4px 8px; flex-wrap:wrap; align-items:center">
                         <span style="font-size:11px; color:var(--c-text-faint); padding:4px 6px 0">Sort by</span>
                         {r.modelSortBtns.map(t => <button key={t.label} onClick={t.pick} style={t.style}>{t.label}</button>)}
                       </div>
@@ -1111,6 +1130,7 @@ export class App extends Component<{}, St> {
                         {sec.tested && <span> · some runs used {sec.tested} (same architecture and size)</span>}
                       </div>
                     )}
+                    {sec.macNote && <div style="margin-top:10px; font-size:12px; line-height:1.5; color:var(--c-text-muted)">{sec.macNote}</div>}
                     {sec.runs.length > 0 && (
                       <div style="margin-top:12px">
                         <div style="font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:var(--c-text-muted); margin-bottom:6px">Measured on real multi-device setups</div>

@@ -1361,5 +1361,243 @@
    "tested": "Kimi K2.5",
    "source": "https://github.com/local-inference-lab/rtx6kpro/blob/master/benchmarks/results.md"
   }
- ]
+ ],
+ "benchmarks": [
+  {
+   "id": "gpqa_diamond",
+   "name": "GPQA Diamond",
+   "short": "GPQA",
+   "unit": "%",
+   "url": "https://arxiv.org/abs/2311.12022",
+   "note": "Graduate-level science questions."
+  },
+  {
+   "id": "swe_bench_verified",
+   "name": "SWE-bench Verified",
+   "short": "SWE-bench",
+   "unit": "%",
+   "url": "https://www.swebench.com",
+   "note": "Resolving real GitHub issues. Model-card values; agent scaffolds differ between vendors, so treat gaps under ~5 points as noise."
+  },
+  {
+   "id": "terminal_bench_2",
+   "name": "Terminal-Bench 2.0",
+   "short": "Terminal-Bench",
+   "unit": "%",
+   "url": "https://www.tbench.ai",
+   "note": "Agentic tasks in a terminal. Version 2.0 only; many 2026 cards report 2.1+, which isn't comparable."
+  },
+  {
+   "id": "livecodebench",
+   "name": "LiveCodeBench",
+   "short": "LiveCodeBench",
+   "unit": "%",
+   "url": "https://livecodebench.github.io",
+   "note": "Fresh competitive-programming problems. Mostly v6; Magistral is v5."
+  },
+  {
+   "id": "aider_polyglot",
+   "name": "Aider Polyglot",
+   "short": "Aider",
+   "unit": "%",
+   "url": "https://aider.chat/docs/leaderboards/",
+   "note": "Code edits across six languages."
+  },
+  {
+   "id": "aime_2025",
+   "name": "AIME 2025",
+   "short": "AIME 25",
+   "unit": "%",
+   "url": "https://artofproblemsolving.com/wiki/index.php/2025_AIME_I",
+   "note": "Competition math, no tools."
+  },
+  {
+   "id": "mmlu_pro",
+   "name": "MMLU-Pro",
+   "short": "MMLU-Pro",
+   "unit": "%",
+   "url": "https://arxiv.org/abs/2406.01574",
+   "note": "Broad knowledge, 10-choice questions."
+  },
+  {
+   "id": "hle",
+   "name": "Humanity's Last Exam",
+   "short": "HLE",
+   "unit": "%",
+   "url": "https://lastexam.ai",
+   "note": "Expert-level questions, no tools."
+  },
+  {
+   "id": "aa_index",
+   "name": "AA Intelligence Index",
+   "short": "AA Index",
+   "unit": "",
+   "url": "https://artificialanalysis.ai",
+   "note": "Artificial Analysis Intelligence Index v4.3.2, a composite of reasoning, knowledge, math and coding evals. This version compresses the scale, and some values are AA's own estimates, so small gaps (and a few rankings, like Kimi K2.6 under Qwen 27B) say little."
+  }
+ ],
+ "scores": {
+  "qwen3.6-27b": {
+   "livecodebench": 90.3,
+   "gpqa_diamond": 89.2,
+   "hle": 30.8,
+   "aa_index": 34,
+   "_note": "Qwen3.8-27B, thinking"
+  },
+  "qwen3.8-flash-next": {
+   "livecodebench": 91.9,
+   "gpqa_diamond": 91.7,
+   "hle": 35.9,
+   "aa_index": 40,
+   "_note": "thinking"
+  },
+  "glm-5.3-flash": {
+   "aa_index": 42,
+   "_note": "thinking (max)"
+  },
+  "gemma-4-26b-a4b": {
+   "livecodebench": 77.1,
+   "gpqa_diamond": 82.3,
+   "mmlu_pro": 82.6,
+   "hle": 8.7,
+   "aa_index": 17
+  },
+  "gpt-oss-20b": {
+   "swe_bench_verified": 60.7,
+   "terminal_bench_2": 3.1,
+   "livecodebench": 77.7,
+   "aider_polyglot": 34.2,
+   "gpqa_diamond": 71.5,
+   "aime_2025": 91.7,
+   "hle": 10.9,
+   "aa_index": 9,
+   "_note": "reasoning high; TB2 from NVIDIA (arXiv 2602.21193)"
+  },
+  "qwen3.6-35b-a3b": {
+   "swe_bench_verified": 73.4,
+   "terminal_bench_2": 51.5,
+   "livecodebench": 80.4,
+   "gpqa_diamond": 86.0,
+   "mmlu_pro": 85.2,
+   "hle": 21.4,
+   "aa_index": 18,
+   "_note": "Qwen3.6-35B-A3B, thinking"
+  },
+  "gemma-4-31b": {
+   "livecodebench": 80.0,
+   "gpqa_diamond": 84.3,
+   "mmlu_pro": 85.2,
+   "hle": 19.5,
+   "aa_index": 15
+  },
+  "qwen3.5-9b": {
+   "livecodebench": 65.6,
+   "gpqa_diamond": 81.7,
+   "mmlu_pro": 82.5,
+   "aa_index": 11,
+   "_note": "thinking"
+  },
+  "deepseek-v4-flash": {
+   "aa_index": 34
+  },
+  "deepseek-v4.1-flash": {
+   "gpqa_diamond": 90.9,
+   "hle": 36.8,
+   "aa_index": 39,
+   "_note": "max effort"
+  },
+  "gpt-oss-120b": {
+   "swe_bench_verified": 62.4,
+   "terminal_bench_2": 18.7,
+   "livecodebench": 87.8,
+   "aider_polyglot": 44.4,
+   "gpqa_diamond": 80.1,
+   "aime_2025": 92.5,
+   "hle": 14.9,
+   "aa_index": 12,
+   "_note": "reasoning high; TB2 from NVIDIA (arXiv 2602.21193)"
+  },
+  "llama-3.1-8b": {
+   "livecodebench": 11.6,
+   "gpqa_diamond": 25.9,
+   "aime_2025": 4.3,
+   "mmlu_pro": 48.3,
+   "hle": 5.3,
+   "aa_index": 7
+  },
+  "gemma-4-12b": {
+   "livecodebench": 72.0,
+   "gpqa_diamond": 78.8,
+   "mmlu_pro": 77.2,
+   "hle": 5.2,
+   "aa_index": 14
+  },
+  "glm-5.3": {
+   "aa_index": 45,
+   "_note": "thinking (max)"
+  },
+  "nemotron-3.5-lightning-30b-a3b": {
+   "swe_bench_verified": 51.6,
+   "gpqa_diamond": 75.4,
+   "mmlu_pro": 81.9,
+   "hle": 11.7,
+   "aa_index": 13
+  },
+  "kimi-k2.6": {
+   "swe_bench_verified": 80.2,
+   "terminal_bench_2": 66.7,
+   "livecodebench": 89.6,
+   "gpqa_diamond": 90.5,
+   "hle": 34.7,
+   "aa_index": 27,
+   "_note": "thinking"
+  },
+  "kimi-k2.7-code": {
+   "aa_index": 26
+  },
+  "qwen3-coder-480b-a35b": {
+   "swe_bench_verified": 69.6,
+   "terminal_bench_2": 23.9,
+   "livecodebench": 44.9,
+   "aider_polyglot": 60.4,
+   "aa_index": 12,
+   "_note": "SWE-bench with OpenHands, 500 turns; AA is an estimate"
+  },
+  "qwen3-coder-next": {
+   "swe_bench_verified": 70.6,
+   "terminal_bench_2": 36.2,
+   "livecodebench": 58.9,
+   "aider_polyglot": 66.2,
+   "gpqa_diamond": 74.5,
+   "aime_2025": 83.1,
+   "mmlu_pro": 80.5,
+   "aa_index": 9
+  },
+  "qwen3-235b-a22b-2507": {
+   "livecodebench": 74.1,
+   "gpqa_diamond": 81.1,
+   "aime_2025": 92.3,
+   "mmlu_pro": 84.4,
+   "hle": 18.2,
+   "aa_index": 13,
+   "_note": "scores are for the Thinking-2507 variant (same weights size)"
+  },
+  "devstral-small-2-24b": {
+   "swe_bench_verified": 68.0,
+   "terminal_bench_2": 22.5,
+   "aa_index": 8
+  },
+  "devstral-2-123b": {
+   "swe_bench_verified": 72.2,
+   "terminal_bench_2": 32.6,
+   "aa_index": 9
+  },
+  "magistral-small-2509": {
+   "livecodebench": 70.9,
+   "gpqa_diamond": 70.1,
+   "aime_2025": 77.3,
+   "aa_index": 9,
+   "_note": "thinking; LiveCodeBench v5"
+  }
+ }
 }

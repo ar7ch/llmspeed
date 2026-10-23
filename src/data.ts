@@ -99,6 +99,18 @@ export interface Link {
   source: string
 }
 
+export interface Bench {
+  id: string
+  name: string
+  short: string
+  unit: string
+  url: string
+  note: string
+}
+
+/** published scores per model id; `_note` says which variant or mode the scores belong to */
+export type Scores = Record<string, number | string | undefined> & { _note?: string }
+
 interface AppData {
   prompt_presets: number[]
   hardware: Hw[]
@@ -109,6 +121,8 @@ interface AppData {
   combos: Record<string, ComboPred>
   links?: Record<string, Link>
   cluster_runs?: ClusterRun[]
+  benchmarks?: Bench[]
+  scores?: Record<string, Scores>
   projected_decode_eff?: Partial<Record<Backend, { dense: number; moe: number }>>
 }
 
@@ -123,6 +137,8 @@ const DATA: AppData = {
   combos: { ...EXTRA.combos, ...(raw as unknown as AppData).combos },
   links: EXTRA.links,
   cluster_runs: EXTRA.cluster_runs,
+  benchmarks: EXTRA.benchmarks,
+  scores: EXTRA.scores,
   projected_decode_eff: EXTRA.projected_decode_eff,
 }
 
@@ -171,7 +187,20 @@ export const nodeCounts = (hw: Hw) => [1, 2, 4, 8].filter(n => n <= linkFor(hw).
 /** a node count this hardware supports, else 1 (for share links and hardware switches) */
 export const clampNodes = (hw: Hw, n: unknown) => typeof n === 'number' && nodeCounts(hw).includes(n) ? n : 1
 
+/** macOS caps GPU-wired memory at ~75% of unified memory; `sudo sysctl iogpu.wired_limit_mb`
+ *  raises it, and leaving ~8 GB for the system is the usual setting. Per-device MB to set. */
+export const macRaisedLimitMb = (hw: Hw) => (hw.vram_gb - 8) * 1024
+export const macRaisedUsable = (hw: Hw, n: number) => (hw.vram_gb - 8) * (n > 1 ? n * 0.97 : 1)
+/** empty for non-Macs, and when raising the limit gains nothing: at 32 GB and below, total - 8 GB is under the 75% default */
+export const macLimitNote = (hw: Hw, n: number) => hw.vendor !== 'apple' || hw.vram_gb - 8 <= hw.vram_gb * 0.75 ? '' :
+  `Macs: macOS lets the GPU use about 75% of unified memory by default, which is what these numbers assume. ` +
+  `Running sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(hw)}${n > 1 ? ' on each Mac' : ''} raises it to leave about 8 GB for the system, ` +
+  `giving about ${Math.round(macRaisedUsable(hw, n))} GB usable here. The setting resets on reboot.`
+
 export const setupName = (hw: Hw, n: number) => n > 1 ? `${n}× ${hw.name}` : hw.name
+
+export const BENCHES: Bench[] = DATA.benchmarks ?? []
+export const scoresOf = (modelId: string): Scores => DATA.scores?.[modelId] ?? {}
 
 export const clusterRuns = (hwId: string, modelId: string) =>
   (DATA.cluster_runs ?? []).filter(r => r.hw === hwId && r.model === modelId).sort((a, b) => a.n - b.n)
