@@ -25,15 +25,11 @@ const PAGE_META = pageMeta(PAGE)
 // below this the count reads as anti-social-proof, so the pills just say "Star"
 const STAR_COUNT_MIN = 50
 const STAR_ICON = <svg class="sb-star" viewBox="0 0 16 16" width={14} height={14} fill="currentColor"><path d="M8 .9l2.2 4.5 4.9.7-3.6 3.5.9 4.9L8 12.2l-4.4 2.3.9-4.9L.9 6.1l4.9-.7z" /></svg>
-// catalog GPUs Runpod rents by the hour (checked against Runpod's GPU list, Oct 2026)
-const RUNPOD_REF = 'https://runpod.io?ref=y0hc0qce'
-const RUNPOD_HW = new Set(['rtx-3090', 'rtx-4090', 'rtx-5080', 'rtx-5090', 'rtx-pro-6000-blackwell', 'h100-80gb', 'h200-141gb'])
-const RUNPOD_LOGO = <svg class="rp-logo" viewBox="8 4 179 198" width={12} height={12} fill="currentColor" aria-hidden><path fill-rule="evenodd" clip-rule="evenodd" d="M170.04 163.76C180.216 157.899 186.485 147.067 186.485 135.344L186.485 70.656C186.485 58.9334 180.216 48.1013 170.04 42.24L113.887 9.89597C103.71 4.03467 91.1731 4.03468 80.997 9.89598L24.8432 42.24C14.6671 48.1013 8.39844 58.9334 8.39844 70.656L8.39844 135.344C8.39844 147.067 14.6672 157.899 24.8432 163.76L80.997 196.104C91.1731 201.965 103.711 201.965 113.887 196.104L170.04 163.76ZM170.04 135.344C170.04 141.205 166.906 146.621 161.818 149.552L132.428 166.48C129.838 167.972 128.543 168.718 127.48 168.607C126.553 168.51 125.711 168.025 125.163 167.272C124.535 166.41 124.535 164.918 124.535 161.934L124.535 128.078C124.535 122.217 127.669 116.801 132.757 113.87L148.493 104.806C150.654 103.562 151.734 102.939 152.52 102.068C153.214 101.298 153.739 100.39 154.058 99.404C154.42 98.2895 154.418 97.0449 154.413 94.5556L154.412 93.8078C154.405 90.0844 154.402 88.2227 153.616 87.1465C152.931 86.2077 151.879 85.6029 150.721 85.4821C149.393 85.3436 147.777 86.2745 144.545 88.1362L124.535 99.662C114.359 105.523 108.09 116.355 108.09 128.078V177.704C108.09 179.434 107.165 181.031 105.664 181.896C100.576 184.827 94.3074 184.827 89.2194 181.896L33.0656 149.552C27.9776 146.621 24.8432 141.205 24.8432 135.344L24.8432 102.001C24.8432 99.0167 24.8432 97.5248 25.4713 96.6622C26.0192 95.9099 26.8613 95.4249 27.7883 95.3277C28.8511 95.2162 30.1462 95.9621 32.7366 97.454L61.518 114.031C66.6059 116.961 69.7403 122.378 69.7403 128.239L69.7403 145.503C69.7403 147.992 69.7403 149.237 70.1037 150.35C70.4253 151.336 70.9512 152.243 71.6472 153.012C72.4339 153.881 73.5155 154.502 75.6786 155.743L76.3283 156.115C79.5638 157.971 81.1816 158.9 82.5087 158.759C83.6663 158.636 84.7175 158.029 85.4012 157.089C86.1851 156.012 86.1851 154.15 86.1851 150.426L86.1851 128.239C86.1851 116.516 79.9164 105.684 69.7403 99.8227L27.7149 75.6181C25.9379 74.5947 24.8432 72.7031 24.8432 70.656C24.8432 64.7947 27.9775 59.3786 33.0656 56.448L89.2194 24.104C94.3074 21.1733 100.576 21.1733 105.664 24.104L134.734 40.8481C137.325 42.3402 138.62 43.0862 139.055 44.0601C139.434 44.9096 139.434 45.8798 139.055 46.7293C138.62 47.7032 137.325 48.4492 134.734 49.9413L105.21 66.9473C100.121 69.8779 93.8528 69.8779 88.7647 66.9473L72.2226 57.4192C70.576 56.4708 69.7527 55.9965 68.8765 55.8061C68.1011 55.6376 67.2992 55.6309 66.5211 55.7864C65.6419 55.962 64.8107 56.4224 63.1483 57.343L61.0974 58.4789C57.7726 60.3202 56.1103 61.2409 55.5478 62.4623C55.0574 63.5273 55.0471 64.7507 55.5195 65.8238C56.0613 67.0545 57.7079 68.0029 61.0011 69.8997L80.5424 81.1553C90.7184 87.0166 103.256 87.0166 113.432 81.1553L156.327 56.448C158.026 55.4695 160.119 55.4695 161.818 56.448C166.906 59.3786 170.04 64.7947 170.04 70.656V135.344Z" /></svg>
 const fmtStars = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : `${n}`
 
 /** n: devices in the setup (absent = 1) */
 interface Cfg { hw: string; model: string; quant: string; n?: number }
-interface Msg { role: 'user' | 'assistant'; text: string; meta?: string; hw?: string }
+interface Msg { role: 'user' | 'assistant'; text: string; meta?: string }
 interface LaneSt { phase: 'norun' | 'prefill' | 'stream' | 'done'; prefillT: number; text: string; liveTok: number; finishT: number; winner: boolean }
 interface St {
   cfgs: Cfg[]; preset: number; custom: string | null; phase: 'idle' | 'running' | 'done'
@@ -391,7 +387,7 @@ export class App extends Component<{}, St> {
       if (!this.isCompare()) {
         const l = lanes[0]
         const meta = `${setupName(l.hw, l.c.n)} · ${l.m.name} · ${l.q.label} · ${fmt(l.c.base)} tok/s · TTFT ${l.c.ttft < 10 ? l.c.ttft.toFixed(1) : Math.round(l.c.ttft)}s`
-        st.history = [...this.state.history, { role: 'assistant' as const, text: words.join(' '), meta, hw: l.hw.id }]
+        st.history = [...this.state.history, { role: 'assistant' as const, text: words.join(' '), meta }]
         st.streamText = ''
       }
     }
@@ -407,7 +403,7 @@ export class App extends Component<{}, St> {
       if (s.streamText) {
         const l = this.runCfg!.lanes[0]
         const meta = `${setupName(l.hw, l.c.n)} · ${l.m.name} · ${l.q.label} · ${fmt(l.c.base)} tok/s · stopped`
-        this.setState(x => ({ phase: 'done' as const, history: [...x.history, { role: 'assistant' as const, text: x.streamText, meta, hw: l.hw.id }], streamText: '' }))
+        this.setState(x => ({ phase: 'done' as const, history: [...x.history, { role: 'assistant' as const, text: x.streamText, meta }], streamText: '' }))
       } else this.setState({ phase: 'idle' })
     }
   }
@@ -668,7 +664,6 @@ export class App extends Component<{}, St> {
         prefillStatus: pStatus(Math.min(1, (sl.prefillT || 0) / Math.max(0.01, l.c.ttft))),
         clock: `${(sl.prefillT || 0).toFixed(1)}s`,
         showText: sl.phase === 'stream' || sl.phase === 'done',
-        rpHw: sl.phase === 'done' && RUNPOD_HW.has(l.hw.id) ? l.hw.id : '',
         text: sl.text || '',
         cursor: sl.phase === 'stream',
         status: sl.phase === 'norun' ? "won't run"
@@ -753,8 +748,6 @@ export class App extends Component<{}, St> {
       starClick: (button: 'nav' | 'cta') => track('star-click', { button }),
       // post-run ask: shown whenever a run has finished
       showStarCta: s.phase === 'done',
-      runpodUrl: RUNPOD_REF,
-      runpodClick: (hw: string) => track('runpod-click', { hw }),
       shareBtnStyle: `background:${s.shared ? 'oklch(0.62 0.17 30 / .08)' : 'none'}; border:1px solid ${s.shared ? 'oklch(0.62 0.17 30 / .5)' : 'var(--c-border)'}; color:${s.shared ? 'oklch(0.52 0.17 30)' : 'var(--c-text-sec)'}; border-radius:99px; padding:6px 13px; font-size:13px; font-weight:500; cursor:pointer`,
       wontRun: !compare && c0.fit === 'no' && !busy && !(collapse && s.cfgOpen),
       wontRunDetail: (() => { const r = rows[0]; return `${r._m.name} at ${r._q.label} needs ${c0.total.toFixed(1)} GB — the ${setupName(r._hw, c0.n)} has ${c0.usable.toFixed(1)} GB usable. ${r._hw.vendor === 'apple' && c0.total <= macRaisedUsable(r._hw, c0.n) ? `It does fit if you raise macOS's GPU memory limit (sudo sysctl iogpu.wired_limit_mb=${macRaisedLimitMb(r._hw)}${c0.n > 1 ? ' on each Mac' : ''}). ` : ''}${suggShow ? '' : 'No quantization of this model fits; pick a smaller model or more memory.'}` })(),
@@ -776,8 +769,6 @@ export class App extends Component<{}, St> {
       scrollRef: (el: HTMLElement | null) => { this._sc = el },
       messages: s.history.map((mm, i) => ({
         text: mm.text, meta: mm.meta || false as string | false,
-        // rental link only under the latest answer, so older turns don't repeat it
-        rpHw: i === s.history.length - 1 && mm.hw && RUNPOD_HW.has(mm.hw) ? mm.hw : '',
         wrapStyle: mm.role === 'user' ? 'align-self:flex-end; max-width:540px; animation:bubbleIn .6s cubic-bezier(.22,.61,.36,1) both' : 'align-self:flex-start; max-width:680px',
         bubbleStyle: mm.role === 'user'
           ? 'background:var(--c-bg-muted); border-radius:16px 16px 4px 16px; padding:12px 16px; font-size:14.5px; line-height:23px; color:var(--c-text); white-space:pre-wrap'
@@ -840,7 +831,6 @@ export class App extends Component<{}, St> {
                   {m.meta && (
                     <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:7px">
                       <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--c-text-faint)">{m.meta}</span>
-                      {m.rpHw && this.renderRunpod(v, m.rpHw)}
                     </div>
                   )}
                 </div>
@@ -885,7 +875,6 @@ export class App extends Component<{}, St> {
                       {L.showText && (
                         <div style="font-size:13.5px; line-height:22px; color:var(--c-text); white-space:pre-wrap">{L.text}{L.cursor && <span style="display:inline-block; width:7px; height:15px; background:oklch(0.62 0.17 30); vertical-align:-2px; margin-left:2px; animation:blink 1s step-end infinite"></span>}</div>
                       )}
-                      {L.rpHw && <div style="margin-top:12px">{this.renderRunpod(v, L.rpHw)}</div>}
                     </div>
                   </div>
                 ))}
@@ -956,14 +945,6 @@ export class App extends Component<{}, St> {
               <span class="sb-label">Star on GitHub</span>
             </a>
           </div>
-    )
-  }
-
-  renderRunpod(v: ReturnType<App['renderVals']>, hw: string) {
-    return (
-      <a href={v.runpodUrl} target="_blank" rel="noopener sponsored" onClick={() => v.runpodClick(hw)} class="rp" title="Rent this GPU by the hour on Runpod (affiliate link)">
-        {RUNPOD_LOGO}<span>Try it on Runpod</span><span class="rp-arrow">↗</span>
-      </a>
     )
   }
 
