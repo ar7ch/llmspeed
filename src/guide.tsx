@@ -10,6 +10,11 @@ import { nativeLowBit } from './data'
 export const READING_TPS = 5.3
 /** coding agents need a long context to hold a repo and tool output; 256K is the practical floor */
 export const AGENT_CTX = 262144
+/** what a coding agent sends on its first step: system prompt plus tool definitions (Claude Code and opencode
+ *  start around 10-25K tokens); later steps add a few thousand tokens to a cached prefix */
+const AGENT_START = 20000
+/** tokens the agent writes in one step: a short plan plus a tool call or an edit */
+const STEP_REPLY = 500
 /** hidden thinking tokens a reasoning model spends before answering */
 const THINK_TOKENS = 2000
 
@@ -36,6 +41,9 @@ export function workloads(c: CalcResult, at: (ctx: number) => CalcResult, contex
   const maxCtx = Math.min(contextMax, memMax)
   const depth = Math.min(maxCtx, AGENT_CTX)
   const agent = depth > 0 ? at(depth) : null
+  // leave room for the reply when the setup holds less than the starting context (maxCtx is a
+  // multiple of 1024 when depth > 0, so this stays positive)
+  const start = depth > 0 ? at(Math.min(AGENT_START, maxCtx - STEP_REPLY)) : null
   return [
     { label: 'Chat', head: cap(band(t, [5, 10, 20, 40], ['slower than you read', 'reading speed', 'comfortable', 'snappy', 'faster than you read'])),
       detail: `${fmt(t)} tok/s; you read about ${READING_TPS}`, good: t >= 10 },
@@ -44,8 +52,8 @@ export function workloads(c: CalcResult, at: (ctx: number) => CalcResult, contex
     agent
       // a rating at a short depth reads faster than one at 256K, so the headline names the depth
       ? { label: 'Agentic coding', head: cap(band(agent.base, [10, 20, 40, 80], ['too slow', 'slow', 'workable', 'good', 'great'])) + (depth < AGENT_CTX ? ` at ${ctxK(depth)}` : ''),
-          detail: `${ctxK(maxCtx)} max context${maxCtx < AGENT_CTX ? ' (256K recommended)' : ''}; ${fmt(agent.base)} tok/s at ${ctxK(depth)}, first read ${secs(agent.ttft)}`,
-          // the first full read is a one-time cost; cached turns run at decode speed, so that decides
+          detail: `${ctxK(maxCtx)} max context${maxCtx < AGENT_CTX ? ' (256K recommended)' : ''}; ${fmt(agent.base)} tok/s at ${ctxK(depth)}, first step ${secs(start!.ttft + STEP_REPLY / start!.base)}`,
+          // the context fills gradually and earlier turns stay cached, so decode speed at depth decides
           good: maxCtx >= AGENT_CTX && agent.base >= 20 }
       : { label: 'Agentic coding', head: 'Won\'t fit', good: false,
           detail: 'no memory left for context after the weights' },
@@ -110,10 +118,12 @@ export function GuideSection() {
         Past 10 s attention wanders, so long prompts need a progress indicator.
       </p>
       <p>
-        Two workloads are bound by prompt processing (prefill), not generation. <strong>Agentic coding</strong> re-sends
+        Two workloads lean on prompt processing (prefill) more than chat does. <strong>Agentic coding</strong> sends
         a large context on every turn, and a real repository plus tool output needs at least 256K tokens of it.
-        The first full read of 256K takes minutes even on fast GPUs (an RTX PRO 6000 prefills about 640 tok/s at that depth, and generation drops
-        from about 200 to 38 tok/s), so prompt caching decides how long later steps wait. Below 256K, agents have to compact or drop history more often.
+        Agents don't read it all at once: the first step sends the system prompt and tool definitions (about 10-25K tokens),
+        and each later step adds a few thousand tokens of file contents or tool output. The runtime keeps the earlier context cached,
+        so a step only processes the new tokens, but generation still slows as the context grows (an RTX PRO 6000 drops
+        from about 200 to 38 tok/s at 256K). Losing the cache, for example after the agent compacts its history, means reading the whole context again. Below 256K, agents have to compact or drop history more often.
         <strong> Document summarization and RAG</strong> wait roughly prompt tokens ÷ prefill speed before the first word.
         Macs and Strix Halo generate well for their price but prefill slowly; discrete NVIDIA cards prefill several times faster.
         <strong> Reasoning models</strong> think in hidden tokens first, so their thinking time acts like extra wait before the answer.
