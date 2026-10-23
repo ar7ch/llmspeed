@@ -3,7 +3,7 @@
 // (src/prerender.tsx) and below the hero in the live app, so crawlers with and without JS see
 // identical content. Must stay free of window/document access.
 import { createContext, type ComponentChildren } from 'preact'
-import { useContext } from 'preact/hooks'
+import { useContext, useState } from 'preact/hooks'
 import { GuideSection } from './guide'
 import { HW, MODELS, PRESETS, quantsFor, releasedLabel, type Hw, type Model, type Quant } from './data'
 import { calc, DEFAULT_OPTS, fmt, type CalcResult, type Opts } from './calc'
@@ -82,6 +82,40 @@ const speed = (c: CalcResult) => runs(c) ? `${fmt(c.base)} tok/s` : "Won't run"
 const ttft = (c: CalcResult) => runs(c) ? `${c.ttft < 10 ? c.ttft.toFixed(1) : Math.round(c.ttft)} s` : '—'
 const fitLabel = (c: CalcResult) => c.fit === 'fits' ? 'Fits' : c.fit === 'partial' ? 'Partial offload' : "Doesn't fit"
 const confLabel = (c: CalcResult) => c.conf === 'measured' ? 'Measured' : c.conf === 'derived' ? 'Derived' : c.conf === 'projected' ? 'Projected' : '—'
+
+const FIT_RANK = { fits: 0, partial: 1, no: 2 }
+/** ascending comparators per column; rows that won't run sink to the bottom of speed columns either way */
+type Col<R> = { label: string; cell: (r: R) => ComponentChildren; cmp?: (a: R, b: R) => number; desc?: boolean }
+type Row = { c: CalcResult }
+const byFit = (a: Row, b: Row) => FIT_RANK[a.c.fit] - FIT_RANK[b.c.fit]
+const byGen = (a: Row, b: Row) => (runs(b.c) ? b.c.base : -1) - (runs(a.c) ? a.c.base : -1)
+const byTtft = (a: Row, b: Row) => (runs(a.c) ? a.c.ttft : Infinity) - (runs(b.c) ? b.c.ttft : Infinity)
+const CONF_RANK = { measured: 0, derived: 1, projected: 2 }
+const byConf = (a: Row, b: Row) => (a.c.conf ? CONF_RANK[a.c.conf] : 3) - (b.c.conf ? CONF_RANK[b.c.conf] : 3)
+const byText = <R,>(f: (r: R) => string) => (a: R, b: R) => f(a).localeCompare(f(b))
+
+/** a table sorted by fit, then generation speed; clicking a header sorts by that column, again to reverse */
+function SortTable<R extends Row>({ cols, rows, rowKey, initial }: { cols: Col<R>[]; rows: R[]; rowKey: (r: R) => string; initial: number }) {
+  const [sort, setSort] = useState({ col: initial, dir: 1 })
+  const cmp = cols[sort.col].cmp
+  // a column flagged desc lists its largest values first in its default direction
+  const asc = (i: number) => (sort.dir > 0) !== !!cols[i].desc
+  const sorted = cmp ? [...rows].sort((a, b) => {
+    // speed columns keep rows that won't run last in both directions
+    const dead = (cmp === byGen || cmp === byTtft) ? Number(!runs(a.c)) - Number(!runs(b.c)) : 0
+    return dead || sort.dir * cmp(a, b) || byGen(a, b)
+  }) : rows
+  return (
+    <div class="seo-table"><table>
+      <thead><tr>{cols.map((c, i) => (
+        <th key={c.label} aria-sort={i === sort.col ? (asc(i) ? 'ascending' : 'descending') : undefined}>
+          {c.cmp ? <button class="seo-sort" onClick={() => setSort(x => ({ col: i, dir: x.col === i ? -x.dir : 1 }))}>{c.label}{i === sort.col ? (asc(i) ? ' ↑' : ' ↓') : ''}</button> : c.label}
+        </th>
+      ))}</tr></thead>
+      <tbody>{sorted.map(r => <tr key={rowKey(r)}>{cols.map(c => <td key={c.label}>{c.cell(r)}</td>)}</tr>)}</tbody>
+    </table></div>
+  )
+}
 const released = (m: Model) => releasedLabel(m.id) ? `, released ${releasedLabel(m.id)}` : ''
 const params = (m: Model) => (m.active_params_b < m.total_params_b
   ? `a ${m.total_params_b}B-parameter mixture-of-experts model (${m.active_params_b}B active per token)`
@@ -162,12 +196,14 @@ function ComboSection({ hw, m, o }: { hw: Hw; m: Model; o: Opts }) {
         {runs(c) && <> Expect about <strong>{fmt(c.base)} tokens/sec</strong> ({fmt(c.lo)}–{fmt(c.hi)}), with the first token after {ttft(c)} for a short prompt. {c.conf && CONF_TEXT[c.conf]}</>}
       </p>
       <h3>Speed by quantization</h3>
-      <div class="seo-table"><table>
-        <thead><tr><th>Quantization</th><th>File size</th><th>Memory</th><th>Generation</th><th>First token</th><th>Source</th></tr></thead>
-        <tbody>{rows.map(r => (
-          <tr key={r.q.id}><td>{r.q.label}</td><td>{m.quants[r.q.id].file_gb.toFixed(1)} GB</td><td>{fitLabel(r.c)}</td><td>{speed(r.c)}</td><td>{ttft(r.c)}</td><td>{runs(r.c) ? confLabel(r.c) : '—'}</td></tr>
-        ))}</tbody>
-      </table></div>
+      <SortTable rows={rows} rowKey={r => r.q.id} initial={2} cols={[
+        { label: 'Quantization', cell: r => r.q.label, cmp: (a, b) => m.quants[a.q.id].file_gb - m.quants[b.q.id].file_gb },
+        { label: 'File size', cell: r => `${m.quants[r.q.id].file_gb.toFixed(1)} GB`, cmp: (a, b) => m.quants[a.q.id].file_gb - m.quants[b.q.id].file_gb },
+        { label: 'Memory', cell: r => fitLabel(r.c), cmp: byFit },
+        { label: 'Generation', cell: r => speed(r.c), cmp: byGen, desc: true },
+        { label: 'First token', cell: r => ttft(r.c), cmp: byTtft },
+        { label: 'Source', cell: r => runs(r.c) ? confLabel(r.c) : '—', cmp: byConf },
+      ]} />
       <h3>{m.name} on other hardware</h3>
       <LinkList items={others.map(o => ({ p: { kind: 'combo', hw: o.h, m }, label: o.h.name, meta: runs(o.c) ? `${fmt(o.c.base)} tok/s at ${o.q.label}` : "won't run" }))} />
       <h3>Other models on the {hw.name}</h3>
@@ -183,12 +219,13 @@ function HwSection({ hw, o }: { hw: Hw; o: Opts }) {
     <>
       <h2>Local LLM speed on the {hw.name}</h2>
       <p>The {hw.name} has {hw.vram_gb} GB of {hw.vendor === 'apple' ? 'unified memory' : 'memory'} and {hw.bandwidth_gbs} GB/s of memory bandwidth, which is what mostly decides generation speed. Below is the expected speed for each model at the best quantization that fits.</p>
-      <div class="seo-table"><table>
-        <thead><tr><th>Model</th><th>Quantization</th><th>Memory</th><th>Generation</th><th>First token</th></tr></thead>
-        <tbody>{rows.map(r => (
-          <tr key={r.m.id}><td><A p={{ kind: 'combo', hw, m: r.m }}>{r.m.name}</A></td><td>{r.q.label}</td><td>{fitLabel(r.c)}</td><td>{speed(r.c)}</td><td>{ttft(r.c)}</td></tr>
-        ))}</tbody>
-      </table></div>
+      <SortTable rows={rows} rowKey={r => r.m.id} initial={2} cols={[
+        { label: 'Model', cell: r => <A p={{ kind: 'combo', hw, m: r.m }}>{r.m.name}</A>, cmp: byText(r => r.m.name) },
+        { label: 'Quantization', cell: r => r.q.label, cmp: byText(r => r.q.label) },
+        { label: 'Memory', cell: r => fitLabel(r.c), cmp: byFit },
+        { label: 'Generation', cell: r => speed(r.c), cmp: byGen, desc: true },
+        { label: 'First token', cell: r => ttft(r.c), cmp: byTtft },
+      ]} />
       <h3>Other hardware</h3>
       <LinkList items={HW.filter(h => h.id !== hw.id).map(h => ({ p: { kind: 'hw', hw: h }, label: h.name }))} />
     </>
@@ -197,17 +234,17 @@ function HwSection({ hw, o }: { hw: Hw; o: Opts }) {
 
 function ModelSection({ m, o }: { m: Model; o: Opts }) {
   const rows = HW.map(hw => ({ hw, ...est(hw, m, o) }))
-    .sort((a, b) => (runs(b.c) ? b.c.base : -1) - (runs(a.c) ? a.c.base : -1))
   return (
     <>
       <h2>{m.name} speed on GPUs and Macs</h2>
       <p>{m.name} is {params(m)}. Smaller quantizations need less memory and run faster, at some cost in quality. Below is the expected speed on each piece of hardware at the best quantization that fits.</p>
-      <div class="seo-table"><table>
-        <thead><tr><th>Hardware</th><th>Quantization</th><th>Memory</th><th>Generation</th><th>First token</th></tr></thead>
-        <tbody>{rows.map(r => (
-          <tr key={r.hw.id}><td><A p={{ kind: 'combo', hw: r.hw, m }}>{r.hw.name}</A></td><td>{r.q.label}</td><td>{fitLabel(r.c)}</td><td>{speed(r.c)}</td><td>{ttft(r.c)}</td></tr>
-        ))}</tbody>
-      </table></div>
+      <SortTable rows={rows} rowKey={r => r.hw.id} initial={2} cols={[
+        { label: 'Hardware', cell: r => <A p={{ kind: 'combo', hw: r.hw, m }}>{r.hw.name}</A>, cmp: byText(r => r.hw.name) },
+        { label: 'Quantization', cell: r => r.q.label, cmp: byText(r => r.q.label) },
+        { label: 'Memory', cell: r => fitLabel(r.c), cmp: byFit },
+        { label: 'Generation', cell: r => speed(r.c), cmp: byGen, desc: true },
+        { label: 'First token', cell: r => ttft(r.c), cmp: byTtft },
+      ]} />
       <h3>Other models</h3>
       <LinkList items={MODELS.filter(x => x.id !== m.id).map(x => ({ p: { kind: 'model', m: x }, label: x.name }))} />
     </>

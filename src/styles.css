@@ -80,6 +80,8 @@ textarea:focus,select:focus,button:focus{outline:none}
 .seo th{text-align:left;font-weight:600;color:var(--c-text-muted);font-size:12px;background:var(--c-bg-subtle);padding:9px 12px;border-bottom:1px solid var(--c-border)}
 .seo td{padding:8px 12px;border-bottom:1px solid var(--c-border-faint);font-variant-numeric:tabular-nums}
 .seo tr:last-child td{border-bottom:none}
+.seo-sort{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;white-space:nowrap}
+.seo-sort:hover,.seo th[aria-sort] .seo-sort{color:var(--c-ink)}
 .seo-links{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 20px}
 .seo-links span{color:var(--c-text-faint);font-size:12.5px}
 .seo-more{margin-top:20px!important}
