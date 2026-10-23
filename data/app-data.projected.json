@@ -2084,7 +2084,7 @@
   },
   {
    "id": "aa_index",
-   "name": "Artificial Analysis Intelligence Index v4.3",
+   "name": "Artificial Analysis Intelligence Index v4.3.2",
    "short": "AA Index",
    "unit": "",
    "released": "2026-09-07",
@@ -2243,7 +2243,7 @@
   },
   "glm-5.3": {
    "tb21": 88.2,
-   "deepswe_v11": 66.9,
+   "deepswe_v11": 69.0,
    "tau3_banking": 50.3,
    "aa_index": 44.8,
    "_note": "reasoning effort max; AA's own TB 2.1 run gives 83.9; LMArena lists only the max-reasoning variant",
@@ -2491,5 +2491,196 @@
    "rx-7900-xtx|llama-3.1-8b|q4_k_m",
    "tesla-v100-32gb|llama-3.1-8b|q4_k_m"
   ]
- }
+ },
+ "closed_refs": [
+  {
+   "id": "claude-opus-5.5",
+   "name": "Claude Opus 5.5",
+   "maker": "Anthropic",
+   "released": "2026-09-22",
+   "scores": {
+    "aa_index": 57.6,
+    "deepswe_v11": 74.2,
+    "arena_text": 1508.7,
+    "arena_webdev": 1806.9,
+    "_note": "max effort; AA index is the Max, Default Fallback run; Arena Text lists only the High variant; DeepSWE is the Opus 5.5 (max) figure in Google's Gemini 4 Argon and Meta's Muse Wonder tables, not on the DeepSWE leaderboard. Anthropic reports Terminal-Bench 4.0, not 2.1",
+    "_vendor": [
+     "deepswe_v11"
+    ]
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+    "https://deepmind.google/models/model-cards/gemini-4-argon/",
+    "https://dev.meta.ai/models/muse-wonder",
+    "https://www.anthropic.com/news/claude-opus-5-5"
+   ]
+  },
+  {
+   "id": "claude-sonnet-5.5",
+   "name": "Claude Sonnet 5.5",
+   "maker": "Anthropic",
+   "released": "2026-09-28",
+   "scores": {
+    "aa_index": 56.0,
+    "arena_text": 1477.5,
+    "arena_webdev": 1767.5,
+    "_note": "AA index is the Max, Default Fallback run; Arena entries are the xHigh variant (WebDev High scores 1706.4)"
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+    "https://www.anthropic.com/news/claude-sonnet-5-5"
+   ]
+  },
+  {
+   "id": "gpt-6-astra",
+   "name": "GPT-6 Astra",
+   "maker": "OpenAI",
+   "released": "2026-09-03",
+   "scores": {
+    "tb21": 88.4,
+    "aa_index": 52.7,
+    "tau3_banking": 41.4,
+    "deepswe_v11": 73.2,
+    "arena_text": 1476.5,
+    "arena_webdev": 1774.7,
+    "_note": "reasoning effort max; xhigh scores TB 2.1 89.1, tau3 banking 43.1, DeepSWE 74.1 (the figure rivals quote)"
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://artificialanalysis.ai/evaluations/terminalbench-v2-1",
+    "https://deepswe.datacurve.ai/",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset"
+   ]
+  },
+  {
+   "id": "gpt-6.1-sol",
+   "name": "GPT-6.1 Sol",
+   "maker": "OpenAI",
+   "released": "2026-09-29",
+   "scores": {
+    "aa_index": 51.8,
+    "deepswe_v11": 75.2,
+    "arena_text": 1479.9,
+    "arena_webdev": 1749.0,
+    "_note": "reasoning effort max for AA and Arena; DeepSWE is OpenAI's launch figure (reported at high effort), read via secondary coverage because openai.com blocked the fetch",
+    "_vendor": [
+     "deepswe_v11"
+    ]
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+    "https://openai.com/index/introducing-gpt-6-1-sol/",
+    "https://datanorth.ai/news/openai-releases-gpt-6-1-sol"
+   ]
+  },
+  {
+   "id": "gemini-4-argon",
+   "name": "Gemini 4 Argon",
+   "maker": "Google",
+   "released": "2026-09-30",
+   "scores": {
+    "aa_index": 52.6,
+    "deepswe_v11": 77.9,
+    "arena_text": 1517.2,
+    "arena_webdev": 1672.7,
+    "_note": "High thinking; announced 2026-09-30 for limited access, generally available 2026-10-13; Arena WebDev has only 2,680 votes",
+    "_vendor": [
+     "deepswe_v11"
+    ]
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+    "https://deepmind.google/models/model-cards/gemini-4-argon/",
+    "https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-argon/"
+   ]
+  },
+  {
+   "id": "gemini-3.8-flash",
+   "name": "Gemini 3.8 Flash",
+   "maker": "Google",
+   "released": "2026-09-02",
+   "scores": {
+    "tb21": 87.6,
+    "aa_index": 40.9,
+    "tau3_banking": 44.9,
+    "deepswe_v11": 73.8,
+    "arena_text": 1495.7,
+    "arena_webdev": 1585.3,
+    "_note": "High thinking"
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://artificialanalysis.ai/evaluations/terminalbench-v2-1",
+    "https://deepswe.datacurve.ai/",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset"
+   ]
+  },
+  {
+   "id": "grok-4.7",
+   "name": "Grok 4.7",
+   "maker": "xAI",
+   "released": "2026-09-21",
+   "scores": {
+    "aa_index": 46.4,
+    "deepswe_v11": 71.0,
+    "arena_text": 1441.0,
+    "arena_webdev": 1636.6,
+    "_note": "xHigh effort; xAI's DeepSWE figure is at high effort",
+    "_vendor": [
+     "deepswe_v11"
+    ]
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+    "https://x.ai/news/grok-4-7"
+   ]
+  },
+  {
+   "id": "muse-wonder",
+   "name": "Muse Wonder",
+   "maker": "Meta",
+   "released": "2026-10-12",
+   "scores": {
+    "aa_index": 52.4,
+    "deepswe_v11": 78.8,
+    "arena_text": 1508.7,
+    "arena_webdev": 1651.1,
+    "_note": "max effort; the API model. Subscription-only Muse Wonder Full scores AA 55.8, DeepSWE 79.0 (Meta), Arena WebDev 1725.9",
+    "_vendor": [
+     "deepswe_v11"
+    ]
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+    "https://dev.meta.ai/models/muse-wonder"
+   ]
+  },
+  {
+   "id": "qwen3.8-max",
+   "name": "Qwen3.8-Max",
+   "maker": "Alibaba",
+   "released": "2026-09-02",
+   "scores": {
+    "tb21": 88.8,
+    "aa_index": 45.4,
+    "tau3_banking": 47.8,
+    "deepswe_v11": 57.5,
+    "arena_text": 1482.9,
+    "arena_webdev": 1673.2,
+    "_note": "0902 snapshot, reasoning; DeepSWE at xhigh"
+   },
+   "sources": [
+    "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
+    "https://artificialanalysis.ai/evaluations/terminalbench-v2-1",
+    "https://deepswe.datacurve.ai/",
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset"
+   ]
+  }
+ ]
 }
