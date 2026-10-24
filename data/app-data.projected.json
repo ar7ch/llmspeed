@@ -2139,6 +2139,15 @@
    "note": "30 competition math problems, no tools. Near-saturated for reasoning models."
   },
   {
+   "id": "cybergym",
+   "name": "CyberGym",
+   "short": "CyberGym",
+   "unit": "%",
+   "released": "2026-10-16",
+   "url": "https://www.cybergym.io/cybergym/",
+   "note": "Security agent reproduces a known vulnerability with a working proof of concept, 1,507 tasks from 188 real projects. Nearly all scores are vendor-reported in each lab's own harness (Claude Code, DeepSeek Harness), so they compare loosely. Anthropic dropped it from the Opus 5.5 system card as saturated, so most closed labs no longer report it."
+  },
+  {
    "id": "tb21",
    "name": "Terminal-Bench 2.1",
    "short": "TB 2.1",
@@ -2225,9 +2234,13 @@
    "tb21": 61.8,
    "tau3_banking": 30.9,
    "aa_index": 24.2,
-   "_note": "first open release (0420), max effort; the 0731 update scores higher (AA 34.3, TB 2.1 78.7); Arena WebDev entry is the High-effort variant",
+   "_note": "first open release (0420), max effort; the 0731 update scores higher (AA 34.3, TB 2.1 78.7, CyberGym 76.7); Arena WebDev entry is the High-effort variant",
    "arena_text": 1435.7,
-   "arena_webdev": 1582.0
+   "arena_webdev": 1582.0,
+   "cybergym": 38.7,
+   "_vendor": [
+    "cybergym"
+   ]
   },
   "deepseek-v4.1-flash": {
    "tb21": 90.6,
@@ -2238,8 +2251,10 @@
    "arena_webdev": 1618.4,
    "tb40": 31.2,
    "_vendor": [
-    "tb40"
-   ]
+    "tb40",
+    "cybergym"
+   ],
+   "cybergym": 88.1
   },
   "gpt-oss-120b": {
    "tb21": 26.2,
@@ -2265,13 +2280,15 @@
    "deepswe_v11": 69.0,
    "tau3_banking": 50.3,
    "aa_index": 44.8,
-   "_note": "reasoning effort max; AA's own TB 2.1 run gives 83.9; LMArena lists only the max-reasoning variant",
+   "_note": "reasoning effort max; AA's own TB 2.1 run gives 83.9; LMArena lists only the max-reasoning variant; CyberGym run in Claude Code",
    "arena_text": 1480.7,
    "arena_webdev": 1622.7,
    "_vendor": [
-    "tb21"
+    "tb21",
+    "cybergym"
    ],
-   "tb40": 41.9
+   "tb40": 41.9,
+   "cybergym": 84.5
   },
   "nemotron-3.5-lightning-30b-a3b": {
    "tb21": 24.6,
@@ -2350,12 +2367,14 @@
    "deepswe_v11": 71.9,
    "arena_text": 1479.5,
    "arena_webdev": 1625.4,
-   "_note": "reasoning; Arena Text has only 4,067 votes",
+   "_note": "reasoning; Arena Text has only 4,067 votes; CyberGym from the RL checkpoint, harness not stated",
    "_vendor": [
     "tb21",
-    "deepswe_v11"
+    "deepswe_v11",
+    "cybergym"
    ],
-   "tb40": 34.8
+   "tb40": 34.8,
+   "cybergym": 94.0
   },
   "mimo-v2.6-flash": {
    "tb21": 87.6,
@@ -2365,9 +2384,12 @@
    "arena_webdev": 1634.0,
    "_vendor": [
     "tb21",
-    "deepswe_v11"
+    "deepswe_v11",
+    "cybergym"
    ],
-   "tb40": 22.7
+   "tb40": 22.7,
+   "cybergym": 95.1,
+   "_note": "CyberGym from the RL checkpoint, harness not stated"
   },
   "minimax-m3": {
    "tb21": 65.2,
@@ -2375,18 +2397,21 @@
    "tau3_banking": 15.3,
    "arena_text": 1439.8,
    "arena_webdev": 1482.4,
-   "_note": "TB 2.1 is AA's own run; MiniMax reports 66.0",
-   "tb40": 2.0
+   "_note": "TB 2.1 is AA's own run; MiniMax reports 66.0; CyberGym is a third-party agent (MopMonk) on the leaderboard",
+   "tb40": 2.0,
+   "cybergym": 73.1
   },
   "minimax-m3.1-flash": {
    "aa_index": 42.7,
    "deepswe_v11": 73.7,
    "arena_webdev": 1589.7,
-   "_note": "Arena WebDev has only 2,164 votes",
+   "_note": "Arena WebDev has only 2,164 votes; CyberGym run in Claude Code",
    "_vendor": [
-    "deepswe_v11"
+    "deepswe_v11",
+    "cybergym"
    ],
-   "tb40": 25.8
+   "tb40": 25.8,
+   "cybergym": 82.2
   }
  },
  "released": {
@@ -2708,14 +2733,16 @@
     "deepswe_v11": 57.5,
     "arena_text": 1482.9,
     "arena_webdev": 1673.2,
-    "_note": "0902 snapshot, reasoning; DeepSWE at xhigh",
-    "tb40": 38.9
+    "_note": "0902 snapshot, reasoning; DeepSWE at xhigh; CyberGym as reported by Zhipu in the GLM-5.3 card",
+    "tb40": 38.9,
+    "cybergym": 78.5
    },
    "sources": [
     "https://artificialanalysis.ai/evaluations/artificial-analysis-intelligence-index",
     "https://artificialanalysis.ai/evaluations/terminalbench-v2-1",
     "https://deepswe.datacurve.ai/",
-    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset"
+    "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset",
+    "https://huggingface.co/zai-org/GLM-5.3"
    ]
   }
  ]
